@@ -201,7 +201,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                 </div>
               </div>
               <div className="text-[10px] text-center" style={{ color: 'var(--subtle)' }}>
-                Arc Testnet · End-to-End Encrypted
+                Arc Mainnet · End-to-End Encrypted
               </div>
             </div>
           </motion.aside>
@@ -249,7 +249,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
               style={{ background: 'var(--surface-mid)', border: '1px solid var(--border)' }}>
               <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: 'var(--secure)' }} />
-              <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>Arc Testnet</span>
+              <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>Arc Mainnet</span>
             </div>
 
             {/* Connect Wallet button */}

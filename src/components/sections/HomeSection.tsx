@@ -277,7 +277,7 @@ export default function HomeSection() {
         >
           <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: '#34d399' }} />
           <span className="text-xs font-semibold tracking-wider uppercase" style={{ color: '#60a5fa' }}>
-            Live on Arc Testnet · 3 Contracts Deployed
+            Live on Arc Mainnet
           </span>
         </motion.div>
 

@@ -16,20 +16,31 @@ PRIVEX is a Web3 privacy protocol on Arc combining wallet-based identity, end-to
 | AccessManager | `contracts/AccessManager.sol` | Wallet identity registry, tier gating by PVX balance |
 | PaymentRouter | `contracts/PaymentRouter.sol` | USDC service payments with fee routing |
 
-## Deployed Addresses — Arc Testnet
+## Deployed Addresses — Arc Mainnet (LIVE)
+
+| Contract | Address | Explorer |
+|----------|---------|---------|
+| PRIVEXToken (PVX) | `0x628074c12e7e0afB1272F86e6d73FD2A49Cd933B` | [explorer](https://explorer.arc.io/address/0x628074c12e7e0afB1272F86e6d73FD2A49Cd933B) |
+| AccessManager | `0x53383e40129b9FD5053048b19dC87bbF960C3631` | [explorer](https://explorer.arc.io/address/0x53383e40129b9FD5053048b19dC87bbF960C3631) |
+| PaymentRouter | `0x6e1238e9B447f15368764195623F573cF10021C0` | [explorer](https://explorer.arc.io/address/0x6e1238e9B447f15368764195623F573cF10021C0) |
+
+Owner/Treasury: `0x43DA1aC2eB4198E04AC05f4B0b88c12220078470`
+
+Set in `.env`:
+```
+VITE_PRIVEX_TOKEN_ADDRESS=0x628074c12e7e0afB1272F86e6d73FD2A49Cd933B
+VITE_ACCESS_MANAGER_ADDRESS=0x53383e40129b9FD5053048b19dC87bbF960C3631
+VITE_PAYMENT_ROUTER_ADDRESS=0x6e1238e9B447f15368764195623F573cF10021C0
+VITE_ARC_NETWORK=mainnet
+```
+
+## Deployed Addresses — Arc Testnet (archived)
 
 | Contract | Address | Explorer |
 |----------|---------|---------|
 | PRIVEXToken (PVX) | `0xdaf854107d4fbffadc841f7dab33f16a81181653` | [explorer](https://explorer.testnet.arc.io/address/0xdaf854107d4fbffadc841f7dab33f16a81181653) |
 | AccessManager | `0x515cb956a4404d6eedd84c253a36778d1d9b5e1e` | [explorer](https://explorer.testnet.arc.io/address/0x515cb956a4404d6eedd84c253a36778d1d9b5e1e) |
 | PaymentRouter | `0x598e9154f451046769c529c3517993e9ebe25800` | [explorer](https://explorer.testnet.arc.io/address/0x598e9154f451046769c529c3517993e9ebe25800) |
-
-Set in `.env`:
-```
-VITE_PRIVEX_TOKEN_ADDRESS=0xdaf854107d4fbffadc841f7dab33f16a81181653
-VITE_ACCESS_MANAGER_ADDRESS=0x515cb956a4404d6eedd84c253a36778d1d9b5e1e
-VITE_PAYMENT_ROUTER_ADDRESS=0x598e9154f451046769c529c3517993e9ebe25800
-```
 
 ## Architecture
 
