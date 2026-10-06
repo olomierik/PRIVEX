@@ -17,7 +17,7 @@ import { getUsdc, buildTxExplorerUrl } from '@/onchain-facts'
 import { usdcDecimalsFor, Amount } from '@/onchain-money'
 import { TokenUSDC } from '@web3icons/react'
 
-const ARC_TESTNET_ID = 5042002
+const ARC_CHAIN_ID = 5042
 
 interface Token {
   symbol: string
@@ -134,7 +134,7 @@ export default function SwapSection() {
   const [showSlippageConfig, setShowSlippageConfig] = useState(false)
   const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const usdcFact = getUsdc(ARC_TESTNET_ID)
+  const usdcFact = getUsdc(ARC_CHAIN_ID)
   const effectiveSlippage = customSlippage || slippage
 
   const { data: usdcBalance } = useReadContract({
@@ -142,12 +142,12 @@ export default function SwapSection() {
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: ARC_TESTNET_ID,
+    chainId: ARC_CHAIN_ID,
     query: { enabled: !!address && !!usdcFact },
   })
 
   const formattedUsdcBal = usdcBalance !== undefined
-    ? Amount.fromRaw(usdcBalance, usdcDecimalsFor(ARC_TESTNET_ID)).toFixed(2)
+    ? Amount.fromRaw(usdcBalance, usdcDecimalsFor(ARC_CHAIN_ID)).toFixed(2)
     : '—'
 
   // Compute live quote with simulated latency
@@ -206,7 +206,7 @@ export default function SwapSection() {
           abi: erc20Abi,
           functionName: 'transfer',
           args: [address, parsed], // self-transfer placeholder
-          chainId: ARC_TESTNET_ID,
+          chainId: ARC_CHAIN_ID,
         })
       } catch {
         toast.error('Invalid amount')
@@ -428,7 +428,7 @@ export default function SwapSection() {
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.status === 'confirmed' ? 'var(--secure)' : r.status === 'pending' ? 'var(--warning)' : 'var(--danger)' }} />
                   {r.hash && r.hash !== '0x' && (
-                    <a href={buildTxExplorerUrl(ARC_TESTNET_ID, r.hash)} target="_blank" rel="noopener noreferrer">
+                    <a href={buildTxExplorerUrl(ARC_CHAIN_ID, r.hash)} target="_blank" rel="noopener noreferrer">
                       <ExternalLink size={10} style={{ color: 'var(--accent)' }} />
                     </a>
                   )}

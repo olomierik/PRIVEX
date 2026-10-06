@@ -1,4 +1,5 @@
 import { useReducer, useEffect } from 'react'
+import { useAccount } from 'wagmi'
 import { PrivexContext, privexReducer, initialState, type NavSection } from './lib/store'
 import PrivexLayout from './components/PrivexLayout'
 import HomeSection from './components/sections/HomeSection'
@@ -14,7 +15,7 @@ import IdentitySection from './components/sections/IdentitySection'
 import SecuritySection from './components/sections/SecuritySection'
 import SettingsSection from './components/sections/SettingsSection'
 import AdminSection from './components/sections/AdminSection'
-import { healthCheck } from './lib/relay'
+import { healthCheck, setWalletAddress } from './lib/relay'
 
 function SectionContent({ section }: { section: NavSection }) {
   switch (section) {
@@ -37,6 +38,12 @@ function SectionContent({ section }: { section: NavSection }) {
 
 function AppInner() {
   const [state, dispatch] = useReducer(privexReducer, initialState)
+  const { address } = useAccount()
+
+  // Keep relay wallet address in sync with connected wallet
+  useEffect(() => {
+    setWalletAddress(address ?? null)
+  }, [address])
 
   useEffect(() => {
     const check = async () => {

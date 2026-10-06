@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send, Plus, Lock, Search, Trash2, UserPlus, AlertTriangle,
   Mic, MicOff, Paperclip, X, Download, Play, Pause, Users, Image,
-  Clock, Check, CheckCheck, MoreHorizontal, Ban, ShieldAlert
+  Clock, Check, CheckCheck, Ban, ShieldAlert
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePrivex, type Contact, type LocalMessage, type Group } from '../../lib/store'
 import { encryptForRecipient, decryptFromSender, shortAddress } from '../../lib/crypto'
-import { sendEncryptedMessage, fetchMessages, sendFileMessage, fetchFileMessage } from '../../lib/relay'
+import { sendEncryptedMessage, fetchMessages, sendFileMessage, fetchFileMessage, subscribeToMessages } from '../../lib/relay'
 import { encryptFile, decryptFile, formatFileSize, MAX_FILE_BYTES } from '../../lib/fileEncryption'
 import { startRecording, formatDuration } from '../../lib/voiceMessage'
 import { useAccount } from 'wagmi'
@@ -209,79 +209,88 @@ export default function MessagingSection() {
     ...state.groups.map(g => ({ id: g.id, label: g.name, isGroup: true, verified: false, blocked: false })),
   ].filter(c => !c.blocked && (c.label.toLowerCase().includes(searchQuery.toLowerCase()) || searchQuery === ''))
 
-  // Poll for new messages
-  useEffect(() => {
-    if (!state.isAuthenticated) return
-    let lastFetch = 0
+  const autoDownloadVoice = useCallback(async (
+    msgId: string, fileId: string, ivHex: string, wrappedKeyHex: string, wrapIvHex: string,
+    senderPubHex: string, mimeType: string, from: string
+  ) => {
+    if (!state.privKeys) return
+    try {
+      const encBlob = await fetchFileMessage(fileId)
+      if (!encBlob) return
+      const encArr = await encBlob.arrayBuffer()
+      const encHex = Array.from(new Uint8Array(encArr)).map(b => b.toString(16).padStart(2, '0')).join('')
+      const { blob } = await decryptFile(
+        { ciphertextHex: encHex, fileIvHex: ivHex, wrappedKeyHex, wrapIvHex, senderEpubkeyHex: senderPubHex, filename: 'voice.webm', mimeType, size: 0 },
+        senderPubHex,
+        state.privKeys.messagingPrivateKey
+      )
+      const url = URL.createObjectURL(blob)
+      dispatch({
+        type: 'SET_MESSAGES', peer: from,
+        messages: (state.messages[from] ?? []).map(m => m.id === msgId ? { ...m, fileBlobUrl: url } : m)
+      })
+    } catch (e) {
+      console.warn('[PRIVEX] Voice auto-download failed', e)
+    }
+  }, [state.privKeys, state.messages, dispatch])
 
-    const poll = async () => {
-      const raw = await fetchMessages(lastFetch)
-      if (raw.length === 0) return
+  // Message processor — handles both initial fetch and realtime push
+  const processMessage = useCallback(async (msg: import('../../lib/relay').RelayMessage) => {
+    if (!state.privKeys) return
 
-      for (const msg of raw) {
-        if (!state.privKeys || !msg.epubkeyHex) continue
-
-        // Handle file/voice metadata messages (type prefix)
-        const isFileMeta = msg.ciphertextHex.startsWith('FILEMETA:')
-        if (isFileMeta) {
-          try {
-            const metaJson = msg.ciphertextHex.slice(9) // strip FILEMETA: prefix
-            const meta = JSON.parse(metaJson) as {
-              fileId: string; fileName: string; mimeType: string; size: number
-              ivHex: string; wrappedKeyHex: string; wrapIvHex: string; senderPubHex: string
-              voiceDuration?: number; disappearsAt?: number
-            }
-            const isVoice = meta.mimeType.startsWith('audio/')
-            const localMsg: LocalMessage = {
-              id: msg.id,
-              from: msg.from,
-              to: msg.to,
-              text: isVoice ? '🎤 Voice message' : `📎 ${meta.fileName}`,
-              timestamp: msg.timestamp,
-              type: isVoice ? 'voice' : 'file',
-              fileName: meta.fileName,
-              fileMime: meta.mimeType,
-              fileSize: meta.size,
-              voiceDuration: meta.voiceDuration,
-              disappearsAt: meta.disappearsAt,
-            }
-            dispatch({ type: 'ADD_MESSAGE', peer: msg.from, message: localMsg })
-            lastFetch = Math.max(lastFetch, msg.timestamp)
-            // Auto-download voice messages
-            if (isVoice) {
-              void autoDownloadVoice(msg.id, meta.fileId, meta.ivHex, meta.wrappedKeyHex, meta.wrapIvHex, meta.senderPubHex, meta.mimeType, msg.from)
-            }
-          } catch { /* malformed meta */ }
-          continue
+    const isFileMeta = msg.ciphertextHex.startsWith('FILEMETA:')
+    if (isFileMeta) {
+      try {
+        const metaJson = msg.ciphertextHex.slice(9)
+        const meta = JSON.parse(metaJson) as {
+          fileId: string; fileName: string; mimeType: string; size: number
+          ivHex: string; wrappedKeyHex: string; wrapIvHex: string; senderPubHex: string
+          voiceDuration?: number; disappearsAt?: number
         }
-
-        try {
-          const parts = msg.ciphertextHex.split(':')
-          if (parts.length < 3) continue
-          const [ivHex, cipherHex, senderPubHex] = parts
-          const text = await decryptFromSender(cipherHex, ivHex, senderPubHex, state.privKeys.messagingPrivateKey)
-          let disappearsAt: number | undefined
-          let actualText = text
-          if (text.startsWith('PRIVEX_EXPIRE:')) {
-            const [, expStr, ...rest] = text.split(':')
-            disappearsAt = parseInt(expStr, 10)
-            actualText = rest.join(':')
-          }
-          const localMsg: LocalMessage = {
-            id: msg.id, from: msg.from, to: msg.to, text: actualText, timestamp: msg.timestamp, type: 'text', disappearsAt,
-          }
-          dispatch({ type: 'ADD_MESSAGE', peer: msg.from, message: localMsg })
-          lastFetch = Math.max(lastFetch, msg.timestamp)
-        } catch {
-          console.warn('[PRIVEX] Could not decrypt message', msg.id)
+        const isVoice = meta.mimeType.startsWith('audio/')
+        const localMsg: LocalMessage = {
+          id: msg.id, from: msg.from, to: msg.to,
+          text: isVoice ? '🎤 Voice message' : `📎 ${meta.fileName}`,
+          timestamp: msg.timestamp, type: isVoice ? 'voice' : 'file',
+          fileName: meta.fileName, fileMime: meta.mimeType, fileSize: meta.size,
+          voiceDuration: meta.voiceDuration, disappearsAt: meta.disappearsAt,
         }
-      }
+        dispatch({ type: 'ADD_MESSAGE', peer: msg.from, message: localMsg })
+        if (isVoice) {
+          void autoDownloadVoice(msg.id, meta.fileId, meta.ivHex, meta.wrappedKeyHex, meta.wrapIvHex, meta.senderPubHex, meta.mimeType, msg.from)
+        }
+      } catch { /* malformed meta */ }
+      return
     }
 
-    const interval = setInterval(() => { void poll() }, 3000)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.isAuthenticated, state.privKeys, dispatch]) // intentionally stable deps: privKeys identity only
+    try {
+      const parts = msg.ciphertextHex.split(':')
+      if (parts.length < 3) return
+      const [ivHex, cipherHex, senderPubHex] = parts
+      const text = await decryptFromSender(cipherHex, ivHex, senderPubHex, state.privKeys.messagingPrivateKey)
+      let disappearsAt: number | undefined
+      let actualText = text
+      if (text.startsWith('PRIVEX_EXPIRE:')) {
+        const [, expStr, ...rest] = text.split(':')
+        disappearsAt = parseInt(expStr, 10)
+        actualText = rest.join(':')
+      }
+      dispatch({
+        type: 'ADD_MESSAGE', peer: msg.from,
+        message: { id: msg.id, from: msg.from, to: msg.to, text: actualText, timestamp: msg.timestamp, type: 'text', disappearsAt },
+      })
+    } catch {
+      console.warn('[PRIVEX] Could not decrypt message', msg.id)
+    }
+  }, [state.privKeys, dispatch, autoDownloadVoice])
+
+  // Subscribe to Supabase Realtime for instant message delivery + initial fetch
+  useEffect(() => {
+    if (!address) return
+    void fetchMessages(0).then(msgs => { msgs.forEach(m => { void processMessage(m) }) })
+    const unsub = subscribeToMessages(address, (msg) => { void processMessage(msg) })
+    return unsub
+  }, [address, processMessage])
 
   // Disappearing message sweep
   useEffect(() => {
@@ -308,32 +317,6 @@ export default function MessagingSection() {
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [])
-
-  const autoDownloadVoice = useCallback(async (
-    msgId: string, fileId: string, ivHex: string, wrappedKeyHex: string, wrapIvHex: string,
-    senderPubHex: string, mimeType: string, from: string
-  ) => {
-    if (!state.privKeys) return
-    try {
-      const encBlob = await fetchFileMessage(fileId)
-      if (!encBlob) return
-      const encArr = await encBlob.arrayBuffer()
-      const encHex = Array.from(new Uint8Array(encArr)).map(b => b.toString(16).padStart(2, '0')).join('')
-      const { blob } = await decryptFile(
-        { ciphertextHex: encHex, fileIvHex: ivHex, wrappedKeyHex, wrapIvHex, senderEpubkeyHex: senderPubHex, filename: 'voice.webm', mimeType, size: 0 },
-        senderPubHex,
-        state.privKeys.messagingPrivateKey
-      )
-      const url = URL.createObjectURL(blob)
-      dispatch({
-        type: 'SET_MESSAGES',
-        peer: from,
-        messages: (state.messages[from] ?? []).map(m => m.id === msgId ? { ...m, fileBlobUrl: url } : m)
-      })
-    } catch (e) {
-      console.warn('[PRIVEX] Voice auto-download failed', e)
-    }
-  }, [state.privKeys, state.messages, dispatch])
 
   const sendMessage = async () => {
     if (!state.activeConversation || !state.privKeys || !address) return
@@ -363,6 +346,7 @@ export default function MessagingSection() {
     setSending(true)
     try {
       let plaintext = messageInput.trim()
+      // oxlint-disable-next-line react/purity -- Date.now() is called in an async event handler, not during render
       if (disappearMs > 0) plaintext = `PRIVEX_EXPIRE:${Date.now() + disappearMs}:${plaintext}`
 
       const { ciphertextHex, ivHex } = await encryptForRecipient(
@@ -374,6 +358,7 @@ export default function MessagingSection() {
 
       dispatch({
         type: 'ADD_MESSAGE', peer: state.activeConversation,
+        // oxlint-disable-next-line react/purity -- Date.now() is called in an async event handler, not during render
         message: { id, from: address, to: state.activeConversation, text: messageInput.trim(), timestamp, type: 'text', disappearsAt: disappearMs > 0 ? Date.now() + disappearMs : undefined }
       })
       setMessageInput('')
@@ -556,12 +541,12 @@ export default function MessagingSection() {
     setShowReactPicker(null)
   }
 
-  if (!state.isAuthenticated) {
+  if (!address) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center space-y-2">
           <Lock size={32} style={{ color: 'var(--subtle)' }} className="mx-auto" />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Authenticate with your wallet to access messaging</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Connect your wallet to access encrypted messaging</p>
         </div>
       </div>
     )
@@ -736,6 +721,13 @@ export default function MessagingSection() {
                           {disappearMs === opt.value && <Check size={10} style={{ color: 'var(--accent)' }} />}
                         </button>
                       ))}
+                      {/* PVX upgrade nudge */}
+                      <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--subtle)' }}>
+                          <ShieldAlert size={9} />
+                          <span>Hold 1K PVX to enable 7d + 30d timers</span>
+                        </div>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>

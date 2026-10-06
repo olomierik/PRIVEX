@@ -19,8 +19,9 @@ import { TokenUSDC } from '@web3icons/react'
 import { getUsdc, buildTxExplorerUrl } from '@/onchain-facts'
 import { parseAmount, Amount, usdcDecimalsFor } from '@/onchain-money'
 import { usePrivex } from '../../lib/store'
+import { ARC_CHAIN_ID } from '../../config'
 
-const ARC_TESTNET_ID = 5042002
+const ARC_TESTNET_ID = ARC_CHAIN_ID  // Arc Mainnet (5042)
 
 type Tab = 'send' | 'receive' | 'history' | 'request'
 
@@ -234,7 +235,7 @@ export default function PaymentsSection() {
           <TokenUSDC variant="branded" size={36} />
           <div>
             <div className="display text-3xl font-bold tabular" style={{ color: 'var(--ink)' }}>{formattedBalance}</div>
-            <div className="text-xs" style={{ color: 'var(--muted)' }}>Arc Testnet · USDC</div>
+            <div className="text-xs" style={{ color: 'var(--muted)' }}>Arc Mainnet · USDC</div>
           </div>
           <button onClick={() => void refetchBalance()} className="ml-auto p-2 rounded-lg transition-colors hover:bg-white/5">
             <RefreshCw size={13} style={{ color: 'var(--muted)' }} />
@@ -257,7 +258,7 @@ export default function PaymentsSection() {
       {isWrongChain && tab !== 'history' && (
         <div className="glass rounded-xl p-3 flex items-center gap-2">
           <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />
-          <span className="text-xs" style={{ color: 'var(--warning)' }}>Switch to Arc Testnet for payments</span>
+          <span className="text-xs" style={{ color: 'var(--warning)' }}>Switch to Arc Mainnet for payments</span>
           <button onClick={() => switchChain({ chainId: ARC_TESTNET_ID })} className="ml-auto text-xs font-semibold" style={{ color: 'var(--accent)' }}>Switch</button>
         </div>
       )}

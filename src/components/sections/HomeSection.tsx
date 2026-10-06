@@ -1,682 +1,730 @@
 /**
- * PRIVEX — Interactive Landing Page
- * Hero + animated stats + feature grid + tier showcase + CTA
+ * PRIVEX — Cosmic Landing Page
+ * Dynamic starfield with galaxies, fire meteors, and real 3D-style motion.
  */
-import { useEffect, useRef, useState } from 'react'
-import { useAccount, useReadContract } from 'wagmi'
-import { erc20Abi, formatUnits } from 'viem'
+import { useRef, useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Shield, Lock, Wifi, MessageSquare, Phone, Mail,
-  ArrowLeftRight, Globe, ShieldCheck,
-  Zap, Eye, Key, CheckCircle, ArrowRight, Activity,
-  Star, ChevronRight,
+  Lock, Shield, ShieldCheck, MessageSquare, Phone, Mail, CreditCard,
+  Zap, Globe, ArrowRight, Star, Activity, CheckCircle2, Eye
 } from 'lucide-react'
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
-import { ConnectKitButton } from 'connectkit'
 import { usePrivex } from '../../lib/store'
-import { getUsdc } from '@/onchain-facts'
-import { TokenUSDC } from '@web3icons/react'
 
-const ARC_TESTNET_ID = 5042002
+// ─── Cosmic Canvas ────────────────────────────────────────────────────────────
 
-const TIER_CONFIG = [
-  { label: 'FREE',    pvx: '0',       color: '#64748b', bg: 'rgba(100,116,139,0.12)', features: ['Identity Registration', 'Limited Messaging (50/day)'] },
-  { label: 'BASIC',   pvx: '1,000',   color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  features: ['Unlimited Messaging', 'File Sharing', 'Contacts'] },
-  { label: 'PRO',     pvx: '10,000',  color: '#22d3ee', bg: 'rgba(34,211,238,0.12)',  features: ['Voice & Video Calls', 'Private Email', 'Advanced Crypto'] },
-  { label: 'PREMIUM', pvx: '50,000',  color: '#818cf8', bg: 'rgba(129,140,248,0.12)', features: ['VPN Access', 'All PRO features', 'Priority Support'] },
-  { label: 'VIP',     pvx: '100,000', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  features: ['All Features', 'Zero Protocol Fees', 'Governance Voting'] },
+interface StarParticle {
+  x: number; y: number; z: number
+  r: number; vx: number; vy: number; vz: number
+  baseAlpha: number; pulse: number; pulseSpeed: number
+  type: 'star' | 'galaxy' | 'dust'
+  color: string
+}
+
+interface Meteor {
+  x: number; y: number
+  vx: number; vy: number
+  len: number; alpha: number
+  color: string; tail: { x: number; y: number }[]
+  type: 'blue' | 'fire'
+}
+
+const STAR_COLORS = [
+  '#ffffff', '#e8f0fe', '#bfdbfe', '#93c5fd', '#67e8f9',
+  '#a5b4fc', '#c4b5fd', '#fde68a', '#fdba74',
 ]
+const FIRE_COLORS = ['#ff6b00', '#ff4500', '#ff2200', '#ffa500', '#ffcc00', '#ff7700']
+const GALAXY_COLORS = ['rgba(96,165,250,', 'rgba(129,140,248,', 'rgba(34,211,238,', 'rgba(167,139,250,']
 
-const FEATURES = [
-  { icon: MessageSquare, label: 'E2E Messaging',      desc: 'AES-GCM 256 encrypted. Server never sees plaintext.', color: '#3b82f6', section: 'messages' as const },
-  { icon: Phone,         label: 'Private Calls',      desc: 'Peer-to-peer WebRTC. Server handles SDP/ICE only.', color: '#22d3ee', section: 'calls' as const },
-  { icon: Mail,          label: 'Encrypted Email',    desc: 'End-to-end email relay. Disappearing messages.', color: '#818cf8', section: 'email' as const },
-  { icon: Wifi,          label: 'VPN',                desc: 'Privacy layer. Your IP stays hidden from observers.', color: '#34d399', section: 'vpn' as const },
-  { icon: Lock,          label: 'USDC Payments',      desc: 'Send, receive, and request USDC with low fees.', color: '#fbbf24', section: 'payments' as const },
-  { icon: ArrowLeftRight,label: 'Token Swap',         desc: 'Swap tokens directly from your private wallet.', color: '#60a5fa', section: 'swap' as const },
-  { icon: Globe,         label: 'Cross-Chain Bridge', desc: 'Move USDC across chains via Circle CCTP.', color: '#a78bfa', section: 'bridge' as const },
-  { icon: ShieldCheck,   label: 'Wallet Identity',    desc: 'On-chain handle registry. No passwords ever.', color: '#f472b6', section: 'identity' as const },
-]
+function initParticles(w: number, h: number): StarParticle[] {
+  const particles: StarParticle[] = []
 
-const STATS = [
-  { value: '256',  unit: 'bit',  label: 'AES-GCM Encryption' },
-  { value: 'P2P',  unit: '',     label: 'WebRTC Call Routing' },
-  { value: '3',    unit: 'x',    label: 'Smart Contracts Live' },
-  { value: '100%', unit: '',     label: 'Non-Custodial' },
-]
+  // Stars (dense field)
+  for (let i = 0; i < 380; i++) {
+    const type = Math.random() < 0.05 ? 'galaxy' : 'star'
+    particles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      z: Math.random() * 1000,
+      r: type === 'galaxy' ? 2 + Math.random() * 3 : 0.3 + Math.random() * 1.8,
+      vx: (Math.random() - 0.5) * 0.06,
+      vy: (Math.random() - 0.5) * 0.04,
+      vz: -0.3 - Math.random() * 0.5,
+      baseAlpha: 0.3 + Math.random() * 0.7,
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.005 + Math.random() * 0.025,
+      type,
+      color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+    })
+  }
 
-const ACCESS_MANAGER_ABI = [
-  { type: 'function', name: 'getAccessTier', inputs: [{ name: 'user', type: 'address' }], outputs: [{ name: '', type: 'uint8' }], stateMutability: 'view' },
-  { type: 'function', name: 'isRegistered',  inputs: [{ name: 'user', type: 'address' }], outputs: [{ name: '', type: 'bool'   }], stateMutability: 'view' },
-] as const
+  // Dust particles
+  for (let i = 0; i < 120; i++) {
+    particles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      z: 500 + Math.random() * 500,
+      r: 0.2 + Math.random() * 0.7,
+      vx: (Math.random() - 0.5) * 0.02,
+      vy: (Math.random() - 0.5) * 0.015,
+      vz: -0.1,
+      baseAlpha: 0.1 + Math.random() * 0.35,
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.003,
+      type: 'dust',
+      color: STAR_COLORS[Math.floor(Math.random() * 4)],
+    })
+  }
 
-const ACCESS_MANAGER_ADDRESS  = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS  as `0x${string}` | undefined
-const PRIVEX_TOKEN_ADDRESS     = import.meta.env.VITE_PRIVEX_TOKEN_ADDRESS    as `0x${string}` | undefined
+  return particles
+}
 
-// Particle canvas
-function ParticleCanvas() {
+function initMeteor(w: number, h: number): Meteor {
+  const isFire = Math.random() < 0.35
+  const startEdge = Math.random()
+  let x: number, y: number
+  if (startEdge < 0.5) { x = Math.random() * w; y = -20 }
+  else { x = -20; y = Math.random() * h * 0.6 }
+
+  const angle = Math.PI / 4 + (Math.random() - 0.5) * 0.6
+  const speed = 3 + Math.random() * 6
+
+  return {
+    x, y,
+    vx: Math.cos(angle) * speed * (isFire ? 1.4 : 1),
+    vy: Math.sin(angle) * speed * (isFire ? 1.4 : 1),
+    len: 60 + Math.random() * 140,
+    alpha: 0.7 + Math.random() * 0.3,
+    color: isFire
+      ? FIRE_COLORS[Math.floor(Math.random() * FIRE_COLORS.length)]
+      : STAR_COLORS[Math.floor(Math.random() * 5)],
+    tail: [],
+    type: isFire ? 'fire' : 'blue',
+  }
+}
+
+function CosmicCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const ctx = canvas.getContext('2d')!
 
+    let w = window.innerWidth
+    let h = window.innerHeight
+    canvas.width = w
+    canvas.height = h
+
+    let particles = initParticles(w, h)
+    const meteors: Meteor[] = []
+    let frame = 0
     let raf: number
-    const particles: { x: number; y: number; vx: number; vy: number; r: number; alpha: number; color: string }[] = []
-    const COLORS = ['#3b82f6', '#60a5fa', '#22d3ee', '#818cf8', '#6366f1']
+    const cx = w / 2
+    const cy = h / 2
 
     const resize = () => {
-      canvas.width  = window.innerWidth
-      canvas.height = window.innerHeight
+      w = window.innerWidth; h = window.innerHeight
+      canvas.width = w; canvas.height = h
+      particles = initParticles(w, h)
     }
-    resize()
     window.addEventListener('resize', resize)
 
-    for (let i = 0; i < 70; i++) {
-      particles.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        r: Math.random() * 1.4 + 0.4,
-        alpha: Math.random() * 0.5 + 0.15,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      })
+    function drawGalaxy(ctx: CanvasRenderingContext2D, p: StarParticle, scale: number, alpha: number) {
+      const gColor = GALAXY_COLORS[Math.floor(p.pulse * 1000) % GALAXY_COLORS.length]
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * scale * 4)
+      grd.addColorStop(0, gColor + '0.9)')
+      grd.addColorStop(0.3, gColor + '0.5)')
+      grd.addColorStop(1, gColor + '0)')
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r * scale * 4, 0, Math.PI * 2)
+      ctx.fillStyle = grd
+      ctx.globalAlpha = alpha * 0.6
+      ctx.fill()
+      // Core
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r * scale * 0.8, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.globalAlpha = alpha * 0.9
+      ctx.fill()
     }
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+    function tick() {
+      frame++
+      ctx.clearRect(0, 0, w, h)
 
-      // Draw connections
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x
-          const dy = particles[i].y - particles[j].y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 120) {
+      // Deep space background
+      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h))
+      bg.addColorStop(0, 'rgba(6, 12, 28, 1)')
+      bg.addColorStop(0.4, 'rgba(3, 8, 20, 1)')
+      bg.addColorStop(1, 'rgba(1, 4, 12, 1)')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, w, h)
+
+      // Nebula clouds
+      if (frame % 3 === 0 || frame < 5) {
+        const nPositions = [
+          { x: w * 0.15, y: h * 0.25, r: 200, c: 'rgba(59,130,246,' },
+          { x: w * 0.80, y: h * 0.15, r: 160, c: 'rgba(129,140,248,' },
+          { x: w * 0.55, y: h * 0.70, r: 220, c: 'rgba(34,211,238,' },
+          { x: w * 0.10, y: h * 0.75, r: 140, c: 'rgba(167,139,250,' },
+          { x: w * 0.90, y: h * 0.60, r: 180, c: 'rgba(249,115,22,' },
+        ]
+        nPositions.forEach(n => {
+          const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r)
+          g.addColorStop(0, n.c + '0.12)')
+          g.addColorStop(0.5, n.c + '0.05)')
+          g.addColorStop(1, n.c + '0)')
+          ctx.globalAlpha = 1
+          ctx.fillStyle = g
+          ctx.fillRect(0, 0, w, h)
+        })
+      }
+
+      // Stars
+      particles.forEach(p => {
+        p.pulse += p.pulseSpeed
+        const pulseMult = 0.7 + Math.sin(p.pulse) * 0.3
+
+        // Perspective projection
+        const fov = 600
+        const scale = fov / (fov - p.z * 0.8)
+        const sx = cx + (p.x - cx) * scale
+        const sy = cy + (p.y - cy) * scale
+        const sr = p.r * scale
+
+        if (p.type === 'galaxy') {
+          ctx.globalAlpha = 1
+          drawGalaxy(ctx, { ...p, x: sx, y: sy }, scale, p.baseAlpha * pulseMult)
+        } else {
+          const alpha = p.baseAlpha * pulseMult * (p.type === 'dust' ? 0.4 : 1)
+          ctx.globalAlpha = alpha
+          if (p.r > 1.2 && p.type === 'star') {
+            // Glow star
+            const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 3)
+            grd.addColorStop(0, p.color)
+            grd.addColorStop(0.4, p.color + 'aa')
+            grd.addColorStop(1, 'transparent')
+            ctx.fillStyle = grd
             ctx.beginPath()
-            ctx.moveTo(particles[i].x, particles[i].y)
-            ctx.lineTo(particles[j].x, particles[j].y)
-            ctx.strokeStyle = `rgba(96,165,250,${(1 - dist / 120) * 0.12})`
-            ctx.lineWidth = 0.5
-            ctx.stroke()
+            ctx.arc(sx, sy, sr * 3, 0, Math.PI * 2)
+            ctx.fill()
+            // Spike cross for bright stars
+            if (p.r > 1.5) {
+              ctx.strokeStyle = p.color
+              ctx.globalAlpha = alpha * 0.25
+              ctx.lineWidth = 0.5
+              ctx.beginPath()
+              ctx.moveTo(sx - sr * 5, sy); ctx.lineTo(sx + sr * 5, sy)
+              ctx.moveTo(sx, sy - sr * 5); ctx.lineTo(sx, sy + sr * 5)
+              ctx.stroke()
+            }
+            ctx.globalAlpha = alpha
           }
+          ctx.fillStyle = p.color
+          ctx.beginPath()
+          ctx.arc(sx, sy, sr, 0, Math.PI * 2)
+          ctx.fill()
         }
+
+        // Move
+        p.x += p.vx; p.y += p.vy; p.z += p.vz
+        if (p.z < 0) { p.z = 1000; p.x = Math.random() * w; p.y = Math.random() * h }
+        if (sx < -20 || sx > w + 20 || sy < -20 || sy > h + 20) {
+          p.x = Math.random() * w; p.y = Math.random() * h; p.z = Math.random() * 500
+        }
+      })
+
+      // Meteors
+      if (frame % 90 === 0 && meteors.length < 6) {
+        meteors.push(initMeteor(w, h))
       }
 
-      // Draw particles
-      for (const p of particles) {
-        p.x += p.vx
-        p.y += p.vy
-        if (p.x < 0) p.x = canvas.width
-        if (p.x > canvas.width) p.x = 0
-        if (p.y < 0) p.y = canvas.height
-        if (p.y > canvas.height) p.y = 0
+      ctx.globalAlpha = 1
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i]
+        m.tail.unshift({ x: m.x, y: m.y })
+        if (m.tail.length > 24) m.tail.pop()
+        m.x += m.vx; m.y += m.vy
+        m.alpha *= 0.992
 
+        if (m.x > w + 100 || m.y > h + 100 || m.alpha < 0.05) {
+          meteors.splice(i, 1); continue
+        }
+
+        // Draw tail
+        if (m.tail.length > 1) {
+          const grad = ctx.createLinearGradient(
+            m.tail[m.tail.length - 1].x, m.tail[m.tail.length - 1].y, m.x, m.y
+          )
+          if (m.type === 'fire') {
+            grad.addColorStop(0, 'rgba(0,0,0,0)')
+            grad.addColorStop(0.3, 'rgba(255,100,0,0.2)')
+            grad.addColorStop(0.7, 'rgba(255,200,0,0.7)')
+            grad.addColorStop(1, 'rgba(255,255,200,0.95)')
+          } else {
+            grad.addColorStop(0, 'rgba(0,0,0,0)')
+            grad.addColorStop(0.5, `rgba(96,165,250,0.3)`)
+            grad.addColorStop(1, 'rgba(255,255,255,0.9)')
+          }
+          ctx.strokeStyle = grad
+          ctx.lineWidth = m.type === 'fire' ? 2.5 : 1.5
+          ctx.shadowColor = m.type === 'fire' ? '#ff6600' : '#60a5fa'
+          ctx.shadowBlur = m.type === 'fire' ? 12 : 6
+          ctx.globalAlpha = m.alpha
+          ctx.beginPath()
+          ctx.moveTo(m.tail[m.tail.length - 1].x, m.tail[m.tail.length - 1].y)
+          m.tail.forEach(pt => ctx.lineTo(pt.x, pt.y))
+          ctx.lineTo(m.x, m.y)
+          ctx.stroke()
+
+          // Fire particle sparks
+          if (m.type === 'fire' && Math.random() < 0.4) {
+            for (let s = 0; s < 3; s++) {
+              ctx.globalAlpha = m.alpha * Math.random()
+              ctx.fillStyle = FIRE_COLORS[Math.floor(Math.random() * FIRE_COLORS.length)]
+              ctx.beginPath()
+              ctx.arc(
+                m.x + (Math.random() - 0.5) * 8,
+                m.y + (Math.random() - 0.5) * 8,
+                Math.random() * 2, 0, Math.PI * 2
+              )
+              ctx.fill()
+            }
+          }
+
+          ctx.shadowBlur = 0
+          ctx.globalAlpha = 1
+        }
+
+        // Head glow
+        ctx.globalAlpha = m.alpha
+        const headGrd = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.type === 'fire' ? 6 : 4)
+        headGrd.addColorStop(0, m.type === 'fire' ? '#ffffff' : '#93c5fd')
+        headGrd.addColorStop(0.5, m.color)
+        headGrd.addColorStop(1, 'transparent')
+        ctx.fillStyle = headGrd
         ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = p.color + Math.round(p.alpha * 255).toString(16).padStart(2, '0')
+        ctx.arc(m.x, m.y, m.type === 'fire' ? 6 : 4, 0, Math.PI * 2)
         ctx.fill()
+        ctx.globalAlpha = 1
       }
 
-      raf = requestAnimationFrame(draw)
+      raf = requestAnimationFrame(tick)
     }
 
-    draw()
-    return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', resize)
-    }
+    raf = requestAnimationFrame(tick)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 0 }}
+      className="absolute inset-0 w-full h-full"
+      style={{ pointerEvents: 'none', zIndex: 0 }}
     />
   )
 }
 
-// Animated counter
-function AnimatedNumber({ value }: { value: string }) {
-  const [displayed, setDisplayed] = useState('0')
-  const [started, setStarted] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
+// ─── Floating privacy indicator ───────────────────────────────────────────────
+function PrivacyOrb({ label, color, delay = 0, repeatDelay = 4 }: { label: string; color: string; delay?: number; repeatDelay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: [0, 1, 1, 0.7, 1], scale: [0.5, 1, 1.03, 1, 1] }}
+      transition={{ delay, duration: 1.2, repeat: Infinity, repeatDelay }}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold"
+      style={{
+        background: `${color}22`,
+        border: `1px solid ${color}44`,
+        color,
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+      {label}
+    </motion.div>
+  )
+}
+
+// ─── Feature Card ─────────────────────────────────────────────────────────────
+const FEATURES = [
+  { icon: MessageSquare, label: 'E2E Messaging', desc: 'All messages are encrypted client-side. The relay never sees plaintext.', color: '#60a5fa', badge: 'FREE' },
+  { icon: Phone, label: 'Encrypted Calls', desc: 'WebRTC DTLS-SRTP. Media streams peer-to-peer — never touch the server.', color: '#34d399', badge: 'PRO' },
+  { icon: Mail, label: 'Private Email', desc: 'ECDH-encrypted subject + body. Only you and the recipient can read it.', color: '#a78bfa', badge: 'FREE' },
+  { icon: CreditCard, label: 'USDC Payments', desc: 'Native USDC on Arc Mainnet. Instant, sub-cent fees.', color: '#22d3ee', badge: 'FREE' },
+  { icon: Globe, label: 'CCTP Bridge', desc: 'Move USDC across chains via Circle CCTP v2 — audited, permissionless.', color: '#f59e0b', badge: 'FREE' },
+  { icon: Eye, label: 'Zero Knowledge', desc: 'No KYC, no sign-up. Your wallet address is your identity.', color: '#f87171', badge: 'ALWAYS' },
+]
+
+const STATS = [
+  { value: '0 ms', label: 'Server read time', sub: 'All data encrypted on device' },
+  { value: 'AES-256', label: 'Encryption standard', sub: 'ECDH + GCM authenticated' },
+  { value: 'P2P', label: 'Call routing', sub: 'No relay media path' },
+  { value: 'USDC', label: 'Native gas', sub: 'Arc Mainnet — no ETH needed' },
+]
+
+const TIERS = [
+  { name: 'FREE', pvx: '0 PVX', color: '#60a5fa', features: ['Encrypted messaging', 'Private email', 'USDC payments', 'CCTP bridge'] },
+  { name: 'PRO', pvx: '10,000 PVX', color: '#818cf8', features: ['Everything in FREE', 'Encrypted voice & video', 'Priority relay routing', 'Custom handle'] },
+  { name: 'ELITE', pvx: '50,000 PVX', color: '#34d399', features: ['Everything in PRO', 'Dedicated relay node', 'Multi-device sync', 'Enterprise SLA'] },
+]
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function HomeSection() {
+  const { dispatch } = usePrivex()
+  const [activeFeature, setActiveFeature] = useState<number | null>(null)
+  const [visibleStats, setVisibleStats] = useState(false)
+  const statsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting && !started) setStarted(true) },
-      { threshold: 0.5 }
+      ([entry]) => { if (entry.isIntersecting) setVisibleStats(true) },
+      { threshold: 0.3 }
     )
-    if (ref.current) obs.observe(ref.current)
+    if (statsRef.current) obs.observe(statsRef.current)
     return () => obs.disconnect()
-  }, [started])
-
-  useEffect(() => {
-    if (!started) return
-    const num = parseFloat(value.replace(/[^0-9.]/g, ''))
-    let timer: ReturnType<typeof setInterval>
-    if (isNaN(num)) {
-      // schedule the update outside the synchronous effect body
-      timer = setInterval(() => {
-        setDisplayed(value)
-        clearInterval(timer)
-      }, 0)
-    } else {
-      let start = 0
-      const step = num / 40
-      timer = setInterval(() => {
-        start = Math.min(start + step, num)
-        setDisplayed(value.includes(',') ? Math.round(start).toLocaleString() : String(Math.round(start * 10) / 10))
-        if (start >= num) clearInterval(timer)
-      }, 30)
-    }
-    return () => clearInterval(timer)
-  }, [started, value])
-
-  return <span ref={ref}>{started ? displayed : '0'}</span>
-}
-
-const fadeUp = {
-  hidden:  { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0 },
-}
-
-const stagger = {
-  visible: { transition: { staggerChildren: 0.08 } },
-}
-
-export default function HomeSection() {
-  const { address } = useAccount()
-  const { dispatch } = usePrivex()
-  const [activeTier, setActiveTier] = useState(1)
-  const heroRef = useRef<HTMLDivElement>(null)
-  const { scrollY } = useScroll()
-  const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.4])
-  const heroY = useTransform(scrollY, [0, 300], [0, 40])
-
-  const usdcFact = getUsdc(ARC_TESTNET_ID)
-
-  const { data: usdcBalance } = useReadContract({
-    address: usdcFact?.address as `0x${string}`,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    chainId: ARC_TESTNET_ID,
-    query: { enabled: !!address && !!usdcFact },
-  })
-
-  const { data: pvxBalance } = useReadContract({
-    address: PRIVEX_TOKEN_ADDRESS,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    chainId: ARC_TESTNET_ID,
-    query: { enabled: !!address && !!PRIVEX_TOKEN_ADDRESS },
-  })
-
-  const { data: accessTier } = useReadContract({
-    address: ACCESS_MANAGER_ADDRESS,
-    abi: ACCESS_MANAGER_ABI,
-    functionName: 'getAccessTier',
-    args: address ? [address] : undefined,
-    chainId: ARC_TESTNET_ID,
-    query: { enabled: !!address && !!ACCESS_MANAGER_ADDRESS },
-  })
-
-  const tier = typeof accessTier === 'number' ? accessTier : 0
-  const formattedUsdc = usdcBalance !== undefined ? parseFloat(formatUnits(usdcBalance, 6)).toFixed(2) : null
-  const formattedPvx  = pvxBalance  !== undefined ? parseFloat(formatUnits(pvxBalance,  18)).toLocaleString(undefined, { maximumFractionDigits: 0 }) : null
-
-  // Auto-cycle tier showcase
-  useEffect(() => {
-    const t = setInterval(() => setActiveTier(i => (i + 1) % TIER_CONFIG.length), 3200)
-    return () => clearInterval(t)
   }, [])
 
+  const navigate = (section: import('../../lib/store').NavSection) =>
+    dispatch({ type: 'SET_SECTION', section })
+
   return (
-    <div className="relative">
-      <ParticleCanvas />
+    <div className="relative overflow-hidden min-h-screen" style={{ background: 'transparent' }}>
+      {/* Cosmic canvas — full page */}
+      <CosmicCanvas />
 
-      {/* ── HERO ─────────────────────────────────────────────────── */}
-      <motion.section
-        ref={heroRef}
-        style={{ opacity: heroOpacity, y: heroY }}
-        className="relative min-h-[92vh] flex flex-col items-center justify-center text-center px-6 pt-16 pb-20"
-      >
-        {/* Scanning line inside hero */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-none">
-          <div className="scan-line" />
-        </div>
-
-        {/* Hero logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.75, y: -12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-          className="mb-8"
-        >
-          <img
-            src="/privex-logo.svg"
-            alt="PRIVEX"
-            className="w-28 h-28 mx-auto"
-            style={{ filter: 'drop-shadow(0 0 28px rgba(59,130,246,0.7)) drop-shadow(0 0 8px rgba(109,40,217,0.5))' }}
-          />
-        </motion.div>
-
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8"
-          style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)' }}
-        >
-          <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: '#34d399' }} />
-          <span className="text-xs font-semibold tracking-wider uppercase" style={{ color: '#60a5fa' }}>
-            Live on Arc Mainnet
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-          className="max-w-4xl"
-        >
-          <motion.h1 variants={fadeUp} className="display font-bold leading-tight mb-4" style={{ fontSize: 'clamp(2.6rem, 6vw, 5rem)', letterSpacing: '-0.04em' }}>
-            <span style={{ color: 'var(--ink)' }}>One Wallet.</span>
-            <br />
-            <span className="gradient-text">One Identity.</span>
-            <br />
-            <span style={{ color: 'var(--ink-2)' }}>Complete Privacy.</span>
-          </motion.h1>
-
-          <motion.p variants={fadeUp} className="text-base md:text-lg leading-relaxed mb-10 max-w-2xl mx-auto" style={{ color: 'var(--muted)' }}>
-            PRIVEX is a Web3 privacy protocol on Arc — encrypted messaging, private calls, email, VPN, and USDC payments, all secured by your wallet.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-3">
-            <ConnectKitButton.Custom>
-              {({ isConnected, show }) =>
-                !isConnected ? (
-                  <motion.button
-                    onClick={show}
-                    whileTap={{ scale: 0.97 }}
-                    className="btn-primary flex items-center gap-2 px-7 py-3.5 text-sm"
-                  >
-                    <Shield size={15} />
-                    Connect Wallet to Start
-                    <ArrowRight size={14} />
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    onClick={() => dispatch({ type: 'SET_SECTION', section: 'messages' })}
-                    whileTap={{ scale: 0.97 }}
-                    className="btn-primary flex items-center gap-2 px-7 py-3.5 text-sm"
-                  >
-                    <MessageSquare size={15} />
-                    Open Dashboard
-                    <ArrowRight size={14} />
-                  </motion.button>
-                )
-              }
-            </ConnectKitButton.Custom>
-
-            <motion.button
-              onClick={() => dispatch({ type: 'SET_SECTION', section: 'identity' })}
-              whileTap={{ scale: 0.97 }}
-              className="btn-ghost flex items-center gap-2 px-6 py-3.5 text-sm"
-            >
-              <Key size={14} />
-              Register Identity
-            </motion.button>
-          </motion.div>
-        </motion.div>
-
-        {/* Live wallet cards (when connected) */}
-        <AnimatePresence>
-          {address && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ delay: 0.2, duration: 0.35 }}
-              className="mt-12 flex flex-wrap justify-center gap-4"
-            >
-              {/* USDC card */}
-              <div className="card-glow rounded-2xl px-5 py-4 flex items-center gap-3 min-w-[180px]">
-                <TokenUSDC variant="branded" size={28} />
-                <div>
-                  <div className="text-xs font-medium" style={{ color: 'var(--subtle)' }}>USDC Balance</div>
-                  <div className="display text-xl font-bold tabular" style={{ color: 'var(--ink)' }}>
-                    {formattedUsdc ?? '—'}
-                  </div>
-                </div>
-              </div>
-
-              {/* PVX card */}
-              <div className="card-glow rounded-2xl px-5 py-4 flex items-center gap-3 min-w-[180px]">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #818cf8 100%)', fontSize: '12px', color: '#fff', fontFamily: 'Space Grotesk', fontWeight: 700 }}>
-                  P
-                </div>
-                <div>
-                  <div className="text-xs font-medium" style={{ color: 'var(--subtle)' }}>PVX Balance</div>
-                  <div className="display text-xl font-bold tabular" style={{ color: 'var(--ink)' }}>
-                    {formattedPvx ?? '—'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tier card */}
-              <div className="card-glow rounded-2xl px-5 py-4 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: TIER_CONFIG[tier].bg, border: `1px solid ${TIER_CONFIG[tier].color}44` }}>
-                  <Star size={13} style={{ color: TIER_CONFIG[tier].color }} />
-                </div>
-                <div>
-                  <div className="text-xs font-medium" style={{ color: 'var(--subtle)' }}>Access Tier</div>
-                  <div className="display text-xl font-bold" style={{ color: TIER_CONFIG[tier].color }}>
-                    {TIER_CONFIG[tier].label}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Scroll cue */}
-        <motion.div
-          animate={{ y: [0, 6, 0] }}
-          transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
-        >
-          <div className="w-5 h-8 rounded-full flex items-start justify-center pt-1.5"
-            style={{ border: '1.5px solid var(--border-strong)' }}>
-            <div className="w-1 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
-          </div>
-        </motion.div>
-      </motion.section>
-
-      {/* ── STATS ────────────────────────────────────────────────── */}
-      <motion.section
-        variants={stagger}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: '-80px' }}
-        className="relative px-6 py-16 max-w-5xl mx-auto"
-      >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {STATS.map(({ value, unit, label }) => (
-            <motion.div
-              key={label}
-              variants={fadeUp}
-              className="card-glow rounded-2xl px-5 py-6 text-center"
-            >
-              <div className="display text-3xl font-bold mb-1 stat-glow" style={{ color: 'var(--accent)' }}>
-                <AnimatedNumber value={value} />{unit}
-              </div>
-              <div className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{label}</div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* ── FEATURES GRID ───────────────────────────────────────── */}
-      <motion.section
-        variants={stagger}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: '-60px' }}
-        className="relative px-6 py-16 max-w-5xl mx-auto"
-      >
-        <motion.div variants={fadeUp} className="text-center mb-12">
-          <h2 className="display text-3xl md:text-4xl font-bold mb-3" style={{ letterSpacing: '-0.03em', color: 'var(--ink)' }}>
-            Everything Private. <span className="gradient-text">Everything Onchain.</span>
-          </h2>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            Eight integrated features secured by your wallet identity. No middlemen, no passwords.
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURES.map(({ icon: Icon, label, desc, color, section }) => (
-            <motion.button
-              key={label}
-              variants={fadeUp}
-              onClick={() => dispatch({ type: 'SET_SECTION', section })}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              whileTap={{ scale: 0.97 }}
-              className="feature-card card-glow rounded-2xl p-5 text-left group cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all group-hover:scale-110"
-                style={{ background: `${color}18`, border: `1px solid ${color}33` }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-              <div className="display text-sm font-bold mb-1.5" style={{ color: 'var(--ink)' }}>{label}</div>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>{desc}</p>
-              <div className="flex items-center gap-1 mt-3 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ color }}>
-                Open <ChevronRight size={11} />
-              </div>
-            </motion.button>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* ── TIER SHOWCASE ────────────────────────────────────────── */}
-      <motion.section
-        variants={stagger}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: '-60px' }}
-        className="relative px-6 py-20 max-w-5xl mx-auto"
-      >
-        <motion.div variants={fadeUp} className="text-center mb-12">
-          <h2 className="display text-3xl md:text-4xl font-bold mb-3" style={{ letterSpacing: '-0.03em', color: 'var(--ink)' }}>
-            Hold <span className="gradient-text">PVX</span> to Unlock More
-          </h2>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            Your PVX balance determines your access tier. The more you hold, the more you unlock.
-          </p>
-        </motion.div>
-
-        {/* Tier selector tabs */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {TIER_CONFIG.map((t, i) => (
-            <button
-              key={t.label}
-              onClick={() => setActiveTier(i)}
-              className="tier-badge transition-all"
-              style={activeTier === i ? {
-                background: t.bg,
-                color: t.color,
-                border: `1px solid ${t.color}55`,
-                boxShadow: `0 0 12px ${t.color}33`,
-              } : {
-                background: 'var(--surface)',
-                color: 'var(--subtle)',
-                border: '1px solid var(--border)',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Active tier card */}
-        <AnimatePresence mode="wait">
+      <div className="relative z-10">
+        {/* ─── Hero ─── */}
+        <section className="min-h-screen flex flex-col items-center justify-center text-center px-4 pt-16 pb-8">
+          {/* Badge */}
           <motion.div
-            key={activeTier}
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: -6 }}
-            transition={{ duration: 0.22 }}
-            className="max-w-xl mx-auto rounded-3xl p-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 mb-6 px-4 py-2 rounded-full"
             style={{
-              background: TIER_CONFIG[activeTier].bg,
-              border: `1px solid ${TIER_CONFIG[activeTier].color}44`,
-              boxShadow: `0 0 40px ${TIER_CONFIG[activeTier].color}22`,
+              background: 'rgba(96,165,250,0.10)',
+              border: '1px solid rgba(96,165,250,0.30)',
+              backdropFilter: 'blur(12px)',
             }}
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ background: `${TIER_CONFIG[activeTier].color}22`, border: `1px solid ${TIER_CONFIG[activeTier].color}55` }}>
-                <Star size={20} style={{ color: TIER_CONFIG[activeTier].color }} />
-              </div>
-              <div>
-                <div className="display text-2xl font-bold" style={{ color: TIER_CONFIG[activeTier].color }}>
-                  {TIER_CONFIG[activeTier].label}
-                </div>
-                <div className="text-sm" style={{ color: 'var(--muted)' }}>
-                  {TIER_CONFIG[activeTier].pvx === '0' ? 'No PVX required' : `Hold ${TIER_CONFIG[activeTier].pvx} PVX`}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {TIER_CONFIG[activeTier].features.map(f => (
-                <div key={f} className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${TIER_CONFIG[activeTier].color}22` }}>
-                    <CheckCircle size={12} style={{ color: TIER_CONFIG[activeTier].color }} />
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--ink-2)' }}>{f}</span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => dispatch({ type: 'SET_SECTION', section: 'swap' })}
-              className="mt-6 w-full py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2"
-              style={{
-                background: `${TIER_CONFIG[activeTier].color}18`,
-                border: `1px solid ${TIER_CONFIG[activeTier].color}44`,
-                color: TIER_CONFIG[activeTier].color,
-              }}
-            >
-              <ArrowLeftRight size={14} />
-              Get PVX via Swap
-            </button>
+            <div className="w-2 h-2 rounded-full secure-pulse" style={{ background: '#34d399' }} />
+            <span className="text-xs font-semibold tracking-wider" style={{ color: '#34d399' }}>
+              LIVE ON ARC MAINNET
+            </span>
+            <Zap size={11} style={{ color: '#fbbf24' }} />
           </motion.div>
-        </AnimatePresence>
-      </motion.section>
 
-      {/* ── PRIVACY PILLARS ──────────────────────────────────────── */}
-      <motion.section
-        variants={stagger}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: '-60px' }}
-        className="relative px-6 py-20 max-w-5xl mx-auto"
-      >
-        <motion.div variants={fadeUp} className="text-center mb-12">
-          <h2 className="display text-3xl md:text-4xl font-bold mb-3" style={{ letterSpacing: '-0.03em', color: 'var(--ink)' }}>
-            Privacy by <span className="gradient-text">Architecture</span>
-          </h2>
-          <p className="text-sm max-w-lg mx-auto" style={{ color: 'var(--muted)' }}>
-            Not a promise — a technical guarantee. Each privacy property is enforced by cryptography, not policy.
-          </p>
-        </motion.div>
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+            className="mb-6"
+          >
+            <img
+              src="/privex-logo.svg"
+              alt="PRIVEX"
+              className="w-24 h-24 mx-auto"
+              style={{ filter: 'drop-shadow(0 0 32px rgba(59,130,246,0.7)) drop-shadow(0 0 80px rgba(59,130,246,0.3))' }}
+            />
+          </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {[
-            { icon: Lock,    title: 'Zero-Knowledge Server', body: 'The relay server receives only ciphertext. It physically cannot read your messages, emails, or call content. Ever.', color: '#3b82f6' },
-            { icon: Key,     title: 'Keys Never Leave',      body: 'Your ECDH P-256 private keys are generated locally in your browser and stored in IndexedDB only. They are never transmitted.', color: '#22d3ee' },
-            { icon: Eye,     title: 'No Metadata Leaks',     body: 'WebRTC calls are peer-to-peer. The signaling server only handles SDP and ICE — never call audio, video, or identities.', color: '#818cf8' },
-            { icon: Shield,  title: 'Wallet Identity',       body: 'Your identity is your wallet. No username, no email, no phone number. Your cryptographic keypair IS your PRIVEX account.', color: '#34d399' },
-            { icon: Zap,     title: 'On-Chain Transparency', body: 'Tier access, payments, and identity commitments are enforced by smart contracts on Arc — open, auditable, and immutable.', color: '#fbbf24' },
-            { icon: Activity,title: 'Honest VPN Claims',     body: 'VPN status is displayed factually — no false anonymity claims. What the VPN covers and what it does not is shown clearly.', color: '#f472b6' },
-          ].map(({ icon: Icon, title, body, color }) => (
-            <motion.div
-              key={title}
-              variants={fadeUp}
-              className="feature-card card-glow rounded-2xl p-6"
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: `${color}18`, border: `1px solid ${color}33` }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-              <h3 className="display text-sm font-bold mb-2" style={{ color: 'var(--ink)' }}>{title}</h3>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>{body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </motion.section>
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="display font-bold text-5xl md:text-7xl mb-4 leading-none"
+          >
+            <span className="gradient-text">PRIVEX</span>
+          </motion.h1>
 
-      {/* ── BOTTOM CTA ───────────────────────────────────────────── */}
-      <motion.section
-        variants={stagger}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: '-40px' }}
-        className="relative px-6 py-24 text-center"
-      >
-        {/* Glow backdrop */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[600px] h-[300px] rounded-full opacity-10"
-            style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)', filter: 'blur(60px)' }} />
-        </div>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-lg md:text-2xl font-medium mb-3 max-w-2xl"
+            style={{ color: 'var(--ink-2)' }}
+          >
+            Your private digital life, onchain.
+          </motion.p>
 
-        <motion.div variants={fadeUp} className="relative max-w-2xl mx-auto">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', boxShadow: '0 0 32px rgba(59,130,246,0.5)' }}>
-            <Shield size={28} className="text-white" />
-          </div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-sm md:text-base max-w-xl mb-8"
+            style={{ color: 'var(--muted)' }}
+          >
+            End-to-end encrypted messaging, calls, and email. USDC payments and cross-chain bridging.
+            No accounts, no KYC — just your wallet.
+          </motion.p>
 
-          <h2 className="display text-3xl md:text-4xl font-bold mb-4" style={{ letterSpacing: '-0.03em', color: 'var(--ink)' }}>
-            Start Your <span className="gradient-text">Private Life</span>
-          </h2>
-          <p className="text-sm mb-8 leading-relaxed" style={{ color: 'var(--muted)' }}>
-            Connect your wallet. No passwords, no registration, no data collection. Your wallet is your key.
-          </p>
+          {/* Floating privacy orbs */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="flex flex-wrap justify-center gap-2 mb-10"
+          >
+            <PrivacyOrb label="Zero-Knowledge" color="#60a5fa" delay={0} repeatDelay={4} />
+            <PrivacyOrb label="E2E Encrypted" color="#34d399" delay={0.2} repeatDelay={5} />
+            <PrivacyOrb label="Non-Custodial" color="#a78bfa" delay={0.4} repeatDelay={6} />
+            <PrivacyOrb label="On-Chain ID" color="#22d3ee" delay={0.6} repeatDelay={4.5} />
+            <PrivacyOrb label="Arc Mainnet" color="#f59e0b" delay={0.8} repeatDelay={5.5} />
+          </motion.div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <ConnectKitButton.Custom>
-              {({ isConnected, show }) => (
-                <motion.button
-                  onClick={isConnected ? () => dispatch({ type: 'SET_SECTION', section: 'identity' }) : show}
-                  whileTap={{ scale: 0.97 }}
-                  className="btn-primary flex items-center gap-2 px-8 py-4 text-sm"
-                >
-                  {isConnected ? <><ShieldCheck size={15} /> Register Identity</> : <><Shield size={15} /> Connect Wallet</>}
-                  <ArrowRight size={14} />
-                </motion.button>
-              )}
-            </ConnectKitButton.Custom>
-
+          {/* CTA buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-wrap justify-center gap-3 mb-12"
+          >
             <motion.button
-              onClick={() => dispatch({ type: 'SET_SECTION', section: 'messages' })}
+              whileHover={{ scale: 1.04, boxShadow: '0 0 40px rgba(59,130,246,0.5)' }}
               whileTap={{ scale: 0.97 }}
-              className="btn-ghost flex items-center gap-2 px-6 py-4 text-sm"
+              onClick={() => navigate('messages')}
+              className="btn-primary flex items-center gap-2 px-6 py-3.5 text-sm font-semibold rounded-xl"
             >
-              <MessageSquare size={14} />
-              Try Messaging
+              <MessageSquare size={16} />
+              Start Messaging
+              <ArrowRight size={14} />
             </motion.button>
-          </div>
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => navigate('payments')}
+              className="btn-ghost flex items-center gap-2 px-6 py-3.5 text-sm font-semibold rounded-xl"
+            >
+              <CreditCard size={16} />
+              Send USDC
+            </motion.button>
+          </motion.div>
 
-          {/* Trust badges */}
-          <div className="flex flex-wrap justify-center gap-4 mt-10">
-            {[
-              { icon: Lock,  text: 'E2E Encrypted' },
-              { icon: Key,   text: 'Non-Custodial' },
-              { icon: Shield,text: 'Arc Onchain' },
-              { icon: Eye,   text: 'Open Source' },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--subtle)' }}>
-                <Icon size={11} style={{ color: 'var(--accent)' }} />
-                {text}
-              </div>
+          {/* Scroll cue */}
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            style={{ color: 'var(--subtle)' }}
+          >
+            <Activity size={16} />
+          </motion.div>
+        </section>
+
+        {/* ─── Stats ─── */}
+        <section ref={statsRef} className="py-16 px-4">
+          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+            {STATS.map((s, i) => (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, y: 30 }}
+                animate={visibleStats ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: i * 0.1 }}
+                className="card-glow rounded-2xl p-5 text-center"
+              >
+                <div className="display text-2xl font-bold stat-glow mb-1" style={{ color: 'var(--accent)' }}>
+                  {s.value}
+                </div>
+                <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--ink-2)' }}>{s.label}</div>
+                <div className="text-[10px]" style={{ color: 'var(--subtle)' }}>{s.sub}</div>
+              </motion.div>
             ))}
           </div>
-        </motion.div>
-      </motion.section>
+        </section>
+
+        {/* ─── Features ─── */}
+        <section className="py-16 px-4">
+          <div className="max-w-4xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-12"
+            >
+              <div className="display text-3xl font-bold mb-3 gradient-text">Built for Privacy</div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Every feature is encrypted by default. No exceptions.</p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {FEATURES.map((f, i) => {
+                const Icon = f.icon
+                const isActive = activeFeature === i
+                return (
+                  <motion.div
+                    key={f.label}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.07 }}
+                    className="feature-card card-glow rounded-2xl p-5 cursor-pointer transition-all"
+                    style={{ borderColor: isActive ? f.color + '55' : undefined }}
+                    onMouseEnter={() => setActiveFeature(i)}
+                    onMouseLeave={() => setActiveFeature(null)}
+                    onClick={() => {
+                      const sectionMap: Record<string, import('../../lib/store').NavSection> = {
+                        'E2E Messaging': 'messages',
+                        'Encrypted Calls': 'calls',
+                        'Private Email': 'email',
+                        'USDC Payments': 'payments',
+                        'CCTP Bridge': 'bridge',
+                        'Zero Knowledge': 'identity',
+                      }
+                      const s = sectionMap[f.label]
+                      if (s) navigate(s)
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ background: f.color + '20' }}>
+                        <Icon size={18} style={{ color: f.color }} />
+                      </div>
+                      <span className="tier-badge" style={{ background: f.color + '20', color: f.color }}>
+                        {f.badge}
+                      </span>
+                    </div>
+                    <h3 className="display font-semibold text-sm mb-2" style={{ color: 'var(--ink)' }}>{f.label}</h3>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{f.desc}</p>
+
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-3 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-1 text-xs" style={{ color: f.color }}>
+                            <span>Open {f.label}</span>
+                            <ArrowRight size={11} />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Tiers ─── */}
+        <section className="py-16 px-4">
+          <div className="max-w-3xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-12"
+            >
+              <div className="display text-3xl font-bold mb-3 gradient-text">PVX Tiers</div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Hold PVX tokens to unlock more powerful features.</p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {TIERS.map((t, i) => (
+                <motion.div
+                  key={t.name}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.12, type: 'spring', stiffness: 180 }}
+                  whileHover={{ y: -4, boxShadow: `0 0 40px ${t.color}33` }}
+                  className="card-glow rounded-2xl p-5"
+                  style={{ borderColor: t.color + '33' }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="tier-badge" style={{ background: t.color + '20', color: t.color }}>
+                      {t.name}
+                    </span>
+                    <Star size={14} style={{ color: t.color }} />
+                  </div>
+                  <div className="display font-bold text-xl mb-1" style={{ color: t.color }}>{t.pvx}</div>
+                  <div className="text-xs mb-4" style={{ color: 'var(--subtle)' }}>minimum balance</div>
+                  <div className="space-y-2">
+                    {t.features.map(feat => (
+                      <div key={feat} className="flex items-center gap-2">
+                        <CheckCircle2 size={11} style={{ color: t.color, flexShrink: 0 }} />
+                        <span className="text-xs" style={{ color: 'var(--ink-2)' }}>{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Security Pillars ─── */}
+        <section className="py-16 px-4">
+          <div className="max-w-3xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="card-glow rounded-3xl p-8 text-center"
+            >
+              <Shield size={36} style={{ color: '#34d399' }} className="mx-auto mb-4" />
+              <h2 className="display text-2xl font-bold mb-3" style={{ color: 'var(--ink)' }}>
+                Security by Design
+              </h2>
+              <p className="text-sm max-w-md mx-auto mb-6" style={{ color: 'var(--muted)' }}>
+                Every byte that leaves your device is encrypted. PRIVEX servers store and forward ciphertext only.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { icon: Lock, label: 'ECDH Key Exchange' },
+                  { icon: Shield, label: 'AES-256-GCM' },
+                  { icon: Eye, label: 'Client-Side Decrypt' },
+                  { icon: Activity, label: 'Disappearing Msgs' },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="glass rounded-xl p-3 text-center">
+                    <Icon size={18} style={{ color: '#34d399' }} className="mx-auto mb-1.5" />
+                    <div className="text-[11px] font-medium" style={{ color: 'var(--ink-2)' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ─── Final CTA ─── */}
+        <section className="py-20 px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="display text-3xl font-bold mb-4 gradient-text">Start Now</h2>
+            <p className="text-sm mb-8" style={{ color: 'var(--muted)' }}>
+              Connect your wallet. No sign-up. No email. No password.
+            </p>
+            <div className="flex justify-center gap-3 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate('messages')}
+                className="btn-primary flex items-center gap-2 px-8 py-4 text-sm font-semibold rounded-xl"
+              >
+                <MessageSquare size={16} />
+                Send First Message
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate('identity')}
+                className="btn-ghost flex items-center gap-2 px-8 py-4 text-sm font-semibold rounded-xl"
+              >
+                <ShieldCheck size={16} />
+                Register Identity
+              </motion.button>
+            </div>
+          </motion.div>
+        </section>
+      </div>
     </div>
   )
 }
+
+

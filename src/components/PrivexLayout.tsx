@@ -1,9 +1,9 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Home, MessageSquare, Phone, Mail, CreditCard, ArrowLeftRight,
   Globe, Wifi, Users, ShieldCheck, Lock, Settings, Menu, X,
-  ChevronRight, LayoutDashboard
+  ChevronRight, LayoutDashboard, Sun, Moon
 } from 'lucide-react'
 import { usePrivex, type NavSection } from '../lib/store'
 import { useAccount } from 'wagmi'
@@ -50,6 +50,21 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
   const { state, dispatch } = usePrivex()
   const { address } = useAccount()
 
+  // Dark/light mode — persisted in localStorage
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('privex-theme') as 'dark' | 'light') ?? 'dark'
+    }
+    return 'dark'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('privex-theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+
   const setSection = (section: NavSection) => {
     dispatch({ type: 'SET_SECTION', section })
     if (window.innerWidth < 768) dispatch({ type: 'TOGGLE_SIDEBAR' })
@@ -90,7 +105,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
             className="fixed md:sticky top-0 left-0 h-dvh w-64 z-30 flex flex-col"
             style={{
-              background: 'rgba(3, 8, 15, 0.92)',
+              background: theme === 'dark' ? 'rgba(3, 8, 15, 0.92)' : 'rgba(240, 244, 255, 0.92)',
               borderRight: '1px solid var(--border)',
               backdropFilter: 'blur(24px) saturate(180%)',
             }}
@@ -213,7 +228,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
         {/* Topbar */}
         <header className="sticky top-0 z-20 flex items-center justify-between px-4 md:px-6 py-3"
           style={{
-            background: 'rgba(3, 8, 15, 0.82)',
+            background: theme === 'dark' ? 'rgba(3, 8, 15, 0.82)' : 'rgba(240, 244, 255, 0.85)',
             borderBottom: '1px solid var(--border)',
             backdropFilter: 'blur(20px) saturate(180%)',
           }}>
@@ -243,7 +258,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             </h1>
           </div>
 
-          {/* Right — network pill + connect wallet */}
+          {/* Right — network pill + theme toggle + connect wallet */}
           <div className="flex items-center gap-2.5">
             {/* Network pill */}
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
@@ -251,6 +266,27 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
               <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: 'var(--secure)' }} />
               <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>Arc Mainnet</span>
             </div>
+
+            {/* Theme toggle */}
+            <motion.button
+              onClick={toggleTheme}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 rounded-xl transition-all"
+              style={{ background: 'var(--surface-mid)', border: '1px solid var(--border)', color: 'var(--muted)' }}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <AnimatePresence mode="wait">
+                {theme === 'dark' ? (
+                  <motion.span key="sun" initial={{ opacity: 0, rotate: -30 }} animate={{ opacity: 1, rotate: 0 }} exit={{ opacity: 0, rotate: 30 }}>
+                    <Sun size={14} />
+                  </motion.span>
+                ) : (
+                  <motion.span key="moon" initial={{ opacity: 0, rotate: 30 }} animate={{ opacity: 1, rotate: 0 }} exit={{ opacity: 0, rotate: -30 }}>
+                    <Moon size={14} />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
 
             {/* Connect Wallet button */}
             <ConnectKitButton.Custom>

@@ -1,21 +1,79 @@
 import { useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { Shield, Key, Copy, Check, RefreshCw, QrCode, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Shield, Key, Copy, Check, RefreshCw, QrCode, AlertTriangle, CheckCircle, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePrivex } from '../../lib/store'
-import { computeCommitment, loadOrCreateKeys, deleteLocalKeys, shortAddress } from '../../lib/crypto'
+import { computeCommitment, loadOrCreateKeys, deleteLocalKeys } from '../../lib/crypto'
 import { ACCESS_MANAGER_ABI } from '../../lib/abis'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 
-const ACCESS_MANAGER_ADDRESS = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as `0x${string}` | undefined
-const ARC_TESTNET_ID = 5042002
+import { ARC_CHAIN_ID } from '../../config'
 
+const ACCESS_MANAGER_ADDRESS = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as `0x${string}` | undefined
+
+const ARC_TESTNET_ID = ARC_CHAIN_ID  // Arc Mainnet (5042)
+
+/**
+ * PVX tiers are UPGRADES, not gates.
+ * Every user gets full access to messaging, calls, and email for free.
+ * Tiers unlock power features and signal support for the network.
+ */
 const TIER_INFO = [
-  { label: 'FREE', pvx: '0', features: ['Wallet identity', 'Limited messaging (10/day)'] },
-  { label: 'BASIC', pvx: '1,000', features: ['Unlimited messaging', 'Group chats'] },
-  { label: 'PRO', pvx: '10,000', features: ['Encrypted calls', 'Private email'] },
-  { label: 'PREMIUM', pvx: '50,000', features: ['VPN access', 'Encrypted file storage'] },
-  { label: 'VIP', pvx: '100,000', features: ['All features', 'Fee discounts', 'Priority support'] },
+  {
+    label: 'EXPLORER', pvx: '0', color: 'var(--subtle)',
+    badge: 'Free forever',
+    features: [
+      'Unlimited encrypted messages',
+      'Encrypted voice & video calls',
+      'Private encrypted email',
+      'USDC payments',
+      'Wallet identity + handle',
+    ],
+  },
+  {
+    label: 'SUPPORTER', pvx: '1,000', color: 'var(--ink-2)',
+    badge: 'Hold 1K PVX',
+    features: [
+      'Everything in Explorer',
+      'Disappearing messages (1h / 24h)',
+      'Group chats (up to 10)',
+      'Custom @privex handle priority',
+    ],
+  },
+  {
+    label: 'BUILDER', pvx: '10,000', color: '#60a5fa',
+    badge: 'Hold 10K PVX',
+    features: [
+      'Everything in Supporter',
+      'Group calls (up to 8 peers)',
+      'Screen sharing + recording',
+      'Encrypted file storage (5 GB)',
+      'Payment fee discount (0.5%)',
+    ],
+  },
+  {
+    label: 'GUARDIAN', pvx: '50,000', color: 'var(--accent)',
+    badge: 'Hold 50K PVX',
+    features: [
+      'Everything in Builder',
+      'VPN access (when available)',
+      'Encrypted file storage (25 GB)',
+      'Faster CCTP bridge routing',
+      'Payment fee discount (1%)',
+    ],
+  },
+  {
+    label: 'SOVEREIGN', pvx: '100,000', color: 'var(--accent-2)',
+    badge: 'Hold 100K PVX',
+    features: [
+      'Everything in Guardian',
+      'Team/org workspace (Phase 2)',
+      'API access',
+      'Priority support',
+      'Maximum fee discount (2%)',
+      'Governance voting rights',
+    ],
+  },
 ]
 
 export default function IdentitySection() {
@@ -249,18 +307,24 @@ export default function IdentitySection() {
         )}
       </div>
 
-      {/* Tier overview */}
+      {/* PVX Upgrade Tiers */}
       <div className="glass-strong rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-1">
           <Shield size={16} style={{ color: 'var(--accent)' }} />
-          <h2 className="display font-semibold text-sm" style={{ color: 'var(--ink)' }}>Access Tiers</h2>
+          <h2 className="display font-semibold text-sm" style={{ color: 'var(--ink)' }}>PVX Upgrade Tiers</h2>
         </div>
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+          All core features are free. Holding PVX unlocks power features — the more you hold, the more you unlock.
+        </p>
         <div className="space-y-2">
-          {TIER_INFO.map((t, i) => (
-            <div key={t.label} className={`glass rounded-xl p-3 ${i === 0 ? 'border' : ''}`} style={i === 0 ? { borderColor: 'var(--border-strong)' } : {}}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold" style={{ color: i === 0 ? 'var(--subtle)' : i === 4 ? 'var(--accent-2)' : 'var(--accent)' }}>{t.label}</span>
-                <span className="mono text-xs" style={{ color: 'var(--muted)' }}>{t.pvx} PVX</span>
+          {TIER_INFO.map((t) => (
+            <div key={t.label} className="glass rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold tracking-wider" style={{ color: t.color }}>{t.label}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.color + '18', color: t.color }}>{t.badge}</span>
+                </div>
+                <span className="mono text-xs font-semibold" style={{ color: 'var(--muted)' }}>{t.pvx} PVX</span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {t.features.map(f => (
@@ -270,9 +334,12 @@ export default function IdentitySection() {
             </div>
           ))}
         </div>
-        <p className="text-xs mt-3" style={{ color: 'var(--subtle)' }}>
-          Token holdings are read from the blockchain. USDC payments are also accepted for resource-intensive services.
-        </p>
+        <div className="mt-4 glass rounded-xl p-3 flex items-start gap-2">
+          <Lock size={11} style={{ color: 'var(--secure)', flexShrink: 0, marginTop: 1 }} />
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            <strong style={{ color: 'var(--ink-2)' }}>How revenue works:</strong> USDC payments through the app carry a small fee that routes to the treasury and burns PVX. Higher-tier users pay lower fees. As PVX is burned, the supply shrinks — every holder benefits from network growth.
+          </p>
+        </div>
       </div>
     </div>
   )

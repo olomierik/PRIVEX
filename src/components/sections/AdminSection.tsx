@@ -15,6 +15,7 @@ type LucideIcon = ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttrib
 
 import { usePrivex } from '../../lib/store'
 import { useAccount } from 'wagmi'
+import { ADMIN_WALLET } from '../../config'
 
 interface MetricCard {
   label: string
@@ -90,6 +91,43 @@ export default function AdminSection() {
   const [showAddress, setShowAddress] = useState(false)
   const [tab, setTab] = useState<'overview' | 'users' | 'services' | 'revenue'>('overview')
 
+  // Access control: only the designated admin wallet can view this panel
+  const isAdmin = address?.toLowerCase() === ADMIN_WALLET.toLowerCase()
+
+  if (!address) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--surface-muted)' }}>
+          <Lock size={28} style={{ color: 'var(--muted)' }} />
+        </div>
+        <h2 className="display font-bold text-lg" style={{ color: 'var(--ink)' }}>Admin Access</h2>
+        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted)' }}>
+          Connect the admin wallet to access the operations panel.
+        </p>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#ef444422' }}>
+          <Shield size={28} style={{ color: 'var(--danger)' }} />
+        </div>
+        <h2 className="display font-bold text-lg" style={{ color: 'var(--ink)' }}>Access Denied</h2>
+        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted)' }}>
+          This panel is restricted to the PRIVEX admin wallet.
+        </p>
+        <div className="glass rounded-xl px-4 py-2 flex items-center gap-2">
+          <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />
+          <span className="mono text-xs" style={{ color: 'var(--subtle)' }}>
+            Connected: {address.slice(0, 10)}...{address.slice(-6)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   const metricCards: MetricCard[] = [
     { label: 'Total Users', value: metrics.totalUsers.toLocaleString(), delta: '+12 today', deltaPositive: true, icon: Users, color: 'var(--accent)' },
     { label: 'Active Wallets (24h)', value: metrics.activeWallets, delta: 'Live', deltaPositive: true, icon: Activity, color: 'var(--accent-2)' },
@@ -118,11 +156,11 @@ export default function AdminSection() {
 
       {/* Admin address */}
       <div className="glass rounded-xl p-3 flex items-center gap-2">
-        <Shield size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <CheckCircle size={12} style={{ color: 'var(--secure)', flexShrink: 0 }} />
         <div className="flex-1 min-w-0">
           <span className="text-xs font-medium" style={{ color: 'var(--ink-2)' }}>Admin wallet: </span>
           <span className="mono text-xs" style={{ color: 'var(--muted)' }}>
-            {showAddress ? (address ?? 'Not connected') : (address ? `${address.slice(0, 10)}...${address.slice(-6)}` : 'Not connected')}
+            {showAddress ? ADMIN_WALLET : `${ADMIN_WALLET.slice(0, 10)}...${ADMIN_WALLET.slice(-6)}`}
           </span>
         </div>
         <button onClick={() => setShowAddress(v => !v)} className="p-1 rounded hover:bg-white/5">

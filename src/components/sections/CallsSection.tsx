@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { usePrivex } from '../../lib/store'
 import { peerRoomId, shortAddress } from '../../lib/crypto'
-import { postSignal, pollSignals } from '../../lib/relay'
+import { postSignal, subscribeToSignals } from '../../lib/relay'
 import { useAccount } from 'wagmi'
 
 type CallState = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended'
@@ -58,8 +58,7 @@ export default function CallsSection() {
   const localStreamRef = useRef<MediaStream | null>(null)
   const screenStreamRef = useRef<MediaStream | null>(null)
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const lastSignalTs = useRef(0)
+  const unsubSignalRef = useRef<(() => void) | null>(null)
 
   const roomId = address && peerAddress ? peerRoomId(address, peerAddress) : ''
 
@@ -68,7 +67,8 @@ export default function CallsSection() {
     screenStreamRef.current?.getTracks().forEach(t => t.stop())
     pcRef.current?.close()
     if (durationRef.current) clearInterval(durationRef.current)
-    if (pollRef.current) clearInterval(pollRef.current)
+    unsubSignalRef.current?.()
+    unsubSignalRef.current = null
     pcRef.current = null
     localStreamRef.current = null
     screenStreamRef.current = null
@@ -114,31 +114,28 @@ export default function CallsSection() {
     return pc
   }
 
-  const startSignalPoll = () => {
-    lastSignalTs.current = Date.now()
-    pollRef.current = setInterval(() => { void (async () => {
-      if (!pcRef.current || !roomId) return
-      const signals = await pollSignals(roomId, lastSignalTs.current)
-      for (const sig of signals) {
-        lastSignalTs.current = Math.max(lastSignalTs.current, sig.ts)
+  const startSignalListen = (currentRoomId: string) => {
+    unsubSignalRef.current?.()
+    unsubSignalRef.current = subscribeToSignals(currentRoomId, (sig) => {
+      void (async () => {
+        if (!pcRef.current) return
         const payload: unknown = JSON.parse(sig.payload)
         if (sig.type === 'offer') {
           await pcRef.current.setRemoteDescription(payload as RTCSessionDescriptionInit)
           const answer = await pcRef.current.createAnswer()
           await pcRef.current.setLocalDescription(answer)
-          void postSignal(roomId, 'answer', JSON.stringify(answer))
+          void postSignal(currentRoomId, 'answer', JSON.stringify(answer))
           setCallState('connected')
         } else if (sig.type === 'answer') {
           await pcRef.current.setRemoteDescription(payload as RTCSessionDescriptionInit)
         } else if (sig.type === 'ice') {
           await pcRef.current.addIceCandidate(payload as RTCIceCandidateInit)
         }
-      }
-    })() }, 1500)
+      })()
+    })
   }
 
   const initiateCall = async () => {
-    if (!state.backendOnline) { toast.error('Relay offline'); return }
     if (!peerAddress.match(/^0x[0-9a-fA-F]{40}$/)) { toast.error('Invalid address'); return }
     setCallState('calling')
 
@@ -157,7 +154,7 @@ export default function CallsSection() {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
       void postSignal(roomId, 'offer', JSON.stringify(offer))
-      startSignalPoll()
+      startSignalListen(roomId)
     } catch {
       toast.error('Could not access camera/microphone')
       setCallState('idle')
@@ -204,12 +201,12 @@ export default function CallsSection() {
 
   const contactsWithKeys = state.contacts.filter(c => c.publicKey && !c.blocked)
 
-  if (!state.isAuthenticated) {
+  if (!address) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center space-y-2">
           <Phone size={32} style={{ color: 'var(--subtle)' }} className="mx-auto" />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Authenticate to access encrypted calls</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Connect your wallet to access encrypted calls</p>
         </div>
       </div>
     )
@@ -468,12 +465,13 @@ export default function CallsSection() {
         </div>
       </div>
 
-      {/* PRO tier notice */}
-      <div className="glass rounded-xl p-3 flex items-center gap-2">
-        <AlertTriangle size={12} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-        <p className="text-xs" style={{ color: 'var(--warning)' }}>
-          Encrypted calls require <strong>PRO tier</strong> (10,000 PVX) in production. Connect wallet and register identity to unlock.
-        </p>
+      {/* Power-features nudge — informational, never a gate */}
+      <div className="glass rounded-xl p-3 flex items-start gap-2">
+        <Lock size={12} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 1 }} />
+        <div className="text-xs" style={{ color: 'var(--muted)' }}>
+          <strong style={{ color: 'var(--ink-2)' }}>Calls are free and fully encrypted.</strong>{' '}
+          Holding PVX unlocks group calls, screen recording, and priority relay routing — upgrades for power users, not gates.
+        </div>
       </div>
     </div>
   )
