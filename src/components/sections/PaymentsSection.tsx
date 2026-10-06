@@ -79,7 +79,8 @@ export default function PaymentsSection() {
   const [privateNote, setPrivateNote] = useState('')
 
   const usdcFact = getUsdc(ARC_TESTNET_ID)
-  const isWrongChain = chainId !== ARC_TESTNET_ID
+  // Only flag wrong chain when a wallet is actually connected
+  const isWrongChain = !!address && chainId !== ARC_TESTNET_ID
 
   const { data: balance, refetch: refetchBalance } = useReadContract({
     address: usdcFact?.address as `0x${string}`,
@@ -230,7 +231,7 @@ export default function PaymentsSection() {
     <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
       {/* Balance card */}
       <div className="glass-strong rounded-2xl p-5">
-        <div className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--subtle)' }}>USDC Balance</div>
+        <div className="label-caps mb-2">USDC Balance</div>
         <div className="flex items-center gap-3">
           <TokenUSDC variant="branded" size={36} />
           <div>
@@ -258,7 +259,7 @@ export default function PaymentsSection() {
       {isWrongChain && tab !== 'history' && (
         <div className="glass rounded-xl p-3 flex items-center gap-2">
           <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />
-          <span className="text-xs" style={{ color: 'var(--warning)' }}>Switch to Arc Mainnet for payments</span>
+          <span className="text-xs" style={{ color: 'var(--warning)' }}>Wrong network — switch to Arc for payments</span>
           <button onClick={() => switchChain({ chainId: ARC_TESTNET_ID })} className="ml-auto text-xs font-semibold" style={{ color: 'var(--accent)' }}>Switch</button>
         </div>
       )}
@@ -316,7 +317,7 @@ export default function PaymentsSection() {
               {quickAmounts.map(q => (
                 <button key={q} onClick={() => setAmount(q)}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ background: amount === q ? 'var(--accent)' : 'var(--surface-muted)', color: amount === q ? '#080e1a' : 'var(--ink-2)' }}>
+                  style={{ background: amount === q ? 'var(--accent)' : 'var(--surface-muted)', color: amount === q ? 'var(--accent-text)' : 'var(--ink-2)' }}>
                   ${q}
                 </button>
               ))}
@@ -348,7 +349,7 @@ export default function PaymentsSection() {
 
           <button onClick={handleSend} disabled={isPending || isConfirming || !recipient || !amount}
             className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
-            style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)', color: '#080e1a' }}>
+            style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}>
             {isPending ? 'Confirm in wallet...' : isConfirming
               ? <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Confirming...</>
               : <><Send size={14} />Send USDC</>}

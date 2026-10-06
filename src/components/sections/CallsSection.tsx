@@ -400,7 +400,7 @@ export default function CallsSection() {
               onClick={() => { void initiateCall() }}
               disabled={!peerAddress}
               className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
-              style={{ background: 'var(--secure)', color: '#080e1a' }}
+              style={{ background: 'var(--secure)', color: '#040e20' }}
             >
               {callMode === 'video' ? <Video size={16} /> : <Phone size={16} />}
               Start Encrypted {callMode === 'video' ? 'Video' : 'Voice'} Call

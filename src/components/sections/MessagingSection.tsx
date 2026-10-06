@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Send, Plus, Lock, Search, Trash2, UserPlus, AlertTriangle,
-  Mic, MicOff, Paperclip, X, Download, Play, Pause, Users, Image,
-  Clock, Check, CheckCheck, Ban, ShieldAlert
+  Send, Lock, Search, Trash2, UserPlus, AlertTriangle,
+  Mic, Paperclip, X, Download, Play, Pause, Users, Image,
+  Clock, Check, CheckCheck, Ban, ShieldAlert, Star
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePrivex, type Contact, type LocalMessage, type Group } from '../../lib/store'
@@ -250,7 +250,7 @@ export default function MessagingSection() {
         const isVoice = meta.mimeType.startsWith('audio/')
         const localMsg: LocalMessage = {
           id: msg.id, from: msg.from, to: msg.to,
-          text: isVoice ? '🎤 Voice message' : `📎 ${meta.fileName}`,
+          text: isVoice ? 'Voice message' : `File: ${meta.fileName}`,
           timestamp: msg.timestamp, type: isVoice ? 'voice' : 'file',
           fileName: meta.fileName, fileMime: meta.mimeType, fileSize: meta.size,
           voiceDuration: meta.voiceDuration, disappearsAt: meta.disappearsAt,
@@ -433,10 +433,10 @@ export default function MessagingSection() {
         type: 'ADD_MESSAGE', peer: state.activeConversation,
         message: {
           id, from: address, to: state.activeConversation,
-          text: isVoice ? '🎤 Voice message' : `📎 ${file.name}`,
           timestamp, type: isVoice ? 'voice' : 'file',
           fileName: file.name, fileMime: file.type, fileSize: file.size,
           fileBlobUrl: blobUrl, disappearsAt: disappearMs > 0 ? Date.now() + disappearMs : undefined,
+          text: isVoice ? 'Voice message' : `File: ${file.name}`,
         }
       })
       setAttachedFile(null)
@@ -553,7 +553,7 @@ export default function MessagingSection() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-57px)]" style={{ height: 'calc(100dvh - 57px)', position: 'relative' }}>
+    <div className="flex h-[calc(100dvh-58px)]" style={{ height: 'calc(100dvh - 58px)', position: 'relative' }}>
       <AnimatePresence>
         {showNewGroup && (
           <NewGroupDialog
@@ -566,17 +566,17 @@ export default function MessagingSection() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <div className="w-64 flex flex-col border-r" style={{ borderColor: 'var(--border)' }}>
+      <div className="w-[260px] flex-shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--border)' }}>
         {/* Search */}
         <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="glass rounded-xl px-3 py-2 flex items-center gap-2">
-            <Search size={12} style={{ color: 'var(--muted)' }} />
+          <div className="glass rounded-xl px-3 py-2.5 flex items-center gap-2">
+            <Search size={13} style={{ color: 'var(--subtle)' }} />
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search conversations..."
-              className="bg-transparent text-xs outline-none flex-1"
-              style={{ color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif" }}
+              className="bg-transparent outline-none flex-1 text-[13px]"
+              style={{ color: 'var(--ink)' }}
             />
           </div>
         </div>
@@ -607,11 +607,11 @@ export default function MessagingSection() {
                     {convo.isGroup ? <Users size={14} /> : convo.label[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold truncate" style={{ color: 'var(--ink)' }}>{convo.label}</div>
+                    <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--ink)' }}>{convo.label}</div>
                     {lastMsg && (
-                      <div className="text-xs truncate" style={{ color: 'var(--subtle)' }}>
+                      <div className="text-[12px] truncate mt-0.5" style={{ color: 'var(--subtle)' }}>
                         {lastMsg.from.toLowerCase() === address?.toLowerCase() ? 'You: ' : ''}
-                        {lastMsg.deleted ? 'Message deleted' : lastMsg.type === 'voice' ? '🎤 Voice' : lastMsg.type === 'file' ? `📎 ${lastMsg.fileName ?? 'File'}` : lastMsg.text}
+                        {lastMsg.deleted ? 'Message deleted' : lastMsg.type === 'voice' ? 'Voice message' : lastMsg.type === 'file' ? `File: ${lastMsg.fileName ?? 'File'}` : lastMsg.text}
                       </div>
                     )}
                   </div>
@@ -633,10 +633,10 @@ export default function MessagingSection() {
         <div className="p-3 border-t space-y-2" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={() => setShowNewGroup(true)}
-            className="w-full py-1.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors hover:opacity-80"
-            style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)' }}
+            className="w-full py-2 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 transition-all hover:opacity-80"
+            style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)', minHeight: 40 }}
           >
-            <Users size={11} />
+            <Users size={13} />
             New Group
           </button>
 
@@ -646,22 +646,22 @@ export default function MessagingSection() {
                 value={newContactAddr}
                 onChange={e => setNewContactAddr(e.target.value)}
                 placeholder="0x... wallet address"
-                className="w-full glass rounded-xl px-3 py-2 text-xs outline-none"
-                style={{ color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}
+                className="w-full glass rounded-xl px-3 py-2.5 text-[12px] outline-none"
+                style={{ color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', minHeight: 40 }}
                 onKeyDown={e => { if (e.key === 'Enter') addContact() }}
               />
               <div className="flex gap-2">
-                <button onClick={addContact} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--accent)', color: '#080e1a' }}>Add</button>
-                <button onClick={() => setShowAddContact(false)} className="flex-1 py-1.5 rounded-lg text-xs" style={{ background: 'var(--surface-muted)', color: 'var(--muted)' }}>Cancel</button>
+                <button onClick={addContact} className="flex-1 py-2 rounded-xl text-[13px] font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-text, #040e20)', minHeight: 40 }}>Add</button>
+                <button onClick={() => setShowAddContact(false)} className="flex-1 py-2 rounded-xl text-[13px]" style={{ background: 'var(--surface-muted)', color: 'var(--muted)', minHeight: 40 }}>Cancel</button>
               </div>
             </div>
           ) : (
             <button
               onClick={() => setShowAddContact(true)}
-              className="w-full py-1.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors hover:opacity-80"
-              style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)' }}
+              className="w-full py-2 rounded-xl text-[13px] font-medium flex items-center justify-center gap-2 transition-all hover:opacity-80"
+              style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)', minHeight: 40 }}
             >
-              <UserPlus size={11} />
+              <UserPlus size={13} />
               Add Contact
             </button>
           )}
@@ -672,18 +672,19 @@ export default function MessagingSection() {
       {state.activeConversation ? (
         <div className="flex-1 flex flex-col">
           {/* Chat header */}
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: isGroup ? 'var(--accent-2)' : 'var(--surface-strong)', color: isGroup ? 'var(--ink)' : 'var(--accent)' }}>
-                {isGroup ? <Users size={13} /> : (activeContact?.handle?.[0]?.toUpperCase() ?? '?')}
+          <div className="px-4 h-[58px] border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold flex-shrink-0"
+                style={{ background: isGroup ? 'linear-gradient(135deg,#4f46e5,#1d4ed8)' : 'var(--surface-strong)', color: isGroup ? '#fff' : 'var(--accent)' }}>
+                {isGroup ? <Users size={14} /> : (activeContact?.handle?.[0]?.toUpperCase() ?? '?')}
               </div>
               <div>
-                <div className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                <div className="text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>
                   {isGroup ? activeGroup.name : (activeContact?.handle ?? shortAddress(state.activeConversation))}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Lock size={9} style={{ color: 'var(--secure)' }} />
-                  <span className="text-xs" style={{ color: 'var(--secure)' }}>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Lock size={10} style={{ color: 'var(--secure)' }} />
+                  <span className="text-[11px]" style={{ color: 'var(--secure)' }}>
                     {isGroup ? `E2E Encrypted · ${activeGroup.members.length} members` : 'End-to-End Encrypted'}
                   </span>
                 </div>
@@ -769,10 +770,10 @@ export default function MessagingSection() {
                     <motion.div
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`px-3 py-2 rounded-2xl text-xs ${isDeleted ? 'italic opacity-50' : ''}`}
+                      className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-snug ${isDeleted ? 'italic opacity-50' : ''}`}
                       style={{
                         background: isMine ? 'var(--accent)' : 'var(--surface-strong)',
-                        color: isMine ? '#080e1a' : 'var(--ink)',
+                        color: isMine ? 'var(--accent-text)' : 'var(--ink)',
                         borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       }}
                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ msgId: msg.id, x: e.clientX, y: e.clientY }) }}
@@ -795,7 +796,7 @@ export default function MessagingSection() {
                           </button>
                         </div>
                       ) : (
-                        <p className={isDeleted ? 'text-xs' : ''}>{isDeleted ? '🗑 Message deleted' : msg.text}</p>
+                        <p className={isDeleted ? 'text-xs italic opacity-60' : ''}>{isDeleted ? 'Message deleted' : msg.text}</p>
                       )}
 
                       {/* Timestamp + status */}
@@ -804,10 +805,10 @@ export default function MessagingSection() {
                           {msg.disappearsAt && msg.disappearsAt > 0 && (
                             <Clock size={8} style={{ color: isMine ? 'rgba(0,0,0,0.4)' : 'var(--subtle)' }} />
                           )}
-                          <span style={{ color: isMine ? 'rgba(0,0,0,0.4)' : 'var(--subtle)', fontSize: '9px' }}>
+                          <span style={{ color: isMine ? 'rgba(0,0,0,0.45)' : 'var(--subtle)', fontSize: '11px' }}>
                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {isMine && (msg.pending ? <Check size={9} style={{ color: 'rgba(0,0,0,0.3)' }} /> : <CheckCheck size={9} style={{ color: 'rgba(0,0,0,0.5)' }} />)}
+                          {isMine && (msg.pending ? <Check size={10} style={{ color: 'rgba(0,0,0,0.35)' }} /> : <CheckCheck size={10} style={{ color: 'rgba(0,0,0,0.55)' }} />)}
                         </div>
                       )}
                     </motion.div>
@@ -847,7 +848,7 @@ export default function MessagingSection() {
                           </div>
                         ) : (
                           <>
-                            <button onClick={() => setShowReactPicker(msg.id)} className="p-1 glass rounded-full">😊</button>
+                            <button onClick={() => setShowReactPicker(msg.id)} className="p-1 glass rounded-full text-xs" style={{ color: 'var(--muted)' }}>+</button>
                             {isMine && (
                               <button onClick={() => dispatch({ type: 'DELETE_MESSAGE', peer: state.activeConversation!, id: msg.id })} className="p-1 glass rounded-full">
                                 <Trash2 size={10} style={{ color: 'var(--danger)' }} />
@@ -913,10 +914,10 @@ export default function MessagingSection() {
                     value={messageInput}
                     onChange={e => setMessageInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage() } }}
-                    placeholder={attachedFile ? 'Add a caption (optional)...' : 'Encrypted message...'}
+                    placeholder={attachedFile ? 'Add a caption...' : 'Encrypted message...'}
                     rows={1}
-                    className="bg-transparent flex-1 text-xs outline-none resize-none"
-                    style={{ color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif", maxHeight: '96px' }}
+                    className="bg-transparent flex-1 outline-none resize-none text-[14px] leading-relaxed"
+                    style={{ color: 'var(--ink)', maxHeight: '120px' }}
                   />
                   <Lock size={10} style={{ color: 'var(--secure)', flexShrink: 0, marginBottom: 2 }} />
                 </div>
@@ -925,19 +926,19 @@ export default function MessagingSection() {
                   <button
                     onClick={() => { void sendMessage() }}
                     disabled={sending}
-                    className="p-2.5 rounded-xl transition-all disabled:opacity-40 hover:opacity-80"
-                    style={{ background: 'var(--accent)', color: '#080e1a' }}
+                    className="flex items-center justify-center rounded-xl transition-all disabled:opacity-40 hover:opacity-80"
+                    style={{ background: 'var(--accent)', color: 'var(--accent-text)', width: 44, height: 44, flexShrink: 0 }}
                   >
-                    <Send size={14} />
+                    <Send size={15} />
                   </button>
                 ) : (
                   <button
                     onMouseDown={() => { void startVoiceRecording() }}
-                    className="p-2.5 rounded-xl transition-all hover:opacity-80"
-                    style={{ background: 'var(--surface-strong)', color: 'var(--ink-2)' }}
+                    className="flex items-center justify-center rounded-xl transition-all hover:opacity-80"
+                    style={{ background: 'var(--surface-strong)', color: 'var(--ink-2)', width: 44, height: 44, flexShrink: 0 }}
                     title="Hold to record voice message"
                   >
-                    <Mic size={14} />
+                    <Mic size={15} />
                   </button>
                 )}
               </div>
@@ -988,7 +989,7 @@ export default function MessagingSection() {
             onClick={e => e.stopPropagation()}
           >
             {[
-              { label: 'React', icon: <span className="text-sm">😊</span>, action: () => { setShowReactPicker(contextMenu.msgId); setContextMenu(null) } },
+              { label: 'React', icon: <Star size={13} style={{ color: 'var(--accent)' }} />, action: () => { setShowReactPicker(contextMenu.msgId); setContextMenu(null) } },
               { label: 'Delete for me', icon: <Trash2 size={13} style={{ color: 'var(--danger)' }} />, action: () => { if (state.activeConversation) dispatch({ type: 'DELETE_MESSAGE', peer: state.activeConversation, id: contextMenu.msgId }); setContextMenu(null) } },
               { label: 'Report', icon: <AlertTriangle size={13} style={{ color: 'var(--warning)' }} />, action: () => { toast.info('Reported (in production, sends anonymized report)'); setContextMenu(null) } },
             ].map(item => (
