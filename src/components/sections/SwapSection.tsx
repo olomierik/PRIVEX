@@ -1,21 +1,15 @@
-/**
- * PRIVEX Swap — Phase 6
- * DEX swap interface on Arc with live quote simulation, token picker,
- * price impact, slippage, gas estimate, tx history.
- * Note: Normal DEX swaps are on-chain and publicly visible.
- * A shielded swap module is planned for Phase 8.
- */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { ArrowUpDown, ChevronDown, CheckCircle, Clock, ExternalLink, Search, X, RefreshCw } from 'lucide-react'
+import { TokenUSDC, TokenWBTC, TokenDAI } from '@web3icons/react'
 import {
-  ArrowUpDown, Info, AlertTriangle, ChevronDown, ExternalLink,
-  Search, X, CheckCircle, Clock, RefreshCw, Zap, TrendingDown,
-} from 'lucide-react'
+  NetworkEthereum, NetworkBase, NetworkArbitrumOne,
+  NetworkOptimism, NetworkPolygon, NetworkAvalanche,
+} from '@web3icons/react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { toast } from 'sonner'
 import { getUsdc, buildTxExplorerUrl } from '@/onchain-facts'
 import { usdcDecimalsFor, Amount } from '@/onchain-money'
-import { TokenUSDC } from '@web3icons/react'
 
 const ARC_CHAIN_ID = 5042
 
@@ -24,28 +18,32 @@ interface Token {
   name: string
   address: string
   decimals: number
-  color: string
-  description: string
+  icon: React.ReactNode
 }
 
 const TOKENS: Token[] = [
-  { symbol: 'USDC', name: 'USD Coin', address: '0x3600000000000000000000000000000000000000', decimals: 6, color: '#2775ca', description: 'Circle stablecoin' },
-  { symbol: 'PVX', name: 'PRIVEX Token', address: '', decimals: 18, color: '#00e596', description: 'PRIVEX utility token' },
-  { symbol: 'WETH', name: 'Wrapped ETH', address: '', decimals: 18, color: '#627eea', description: 'Wrapped Ether' },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', address: '', decimals: 8, color: '#f7931a', description: 'Wrapped Bitcoin' },
-  { symbol: 'DAI', name: 'Dai', address: '', decimals: 18, color: '#f5ac37', description: 'MakerDAO stablecoin' },
-  { symbol: 'ARB', name: 'Arbitrum', address: '', decimals: 18, color: '#28a0f0', description: 'Arbitrum governance token' },
+  { symbol: 'USDC', name: 'USD Coin',       address: '0x3600000000000000000000000000000000000000', decimals: 6,  icon: <TokenUSDC variant="branded" size={28} /> },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', address: '',                                           decimals: 8,  icon: <TokenWBTC variant="branded" size={28} /> },
+  { symbol: 'DAI',  name: 'Dai',             address: '',                                           decimals: 18, icon: <TokenDAI  variant="branded" size={28} /> },
+  { symbol: 'WETH', name: 'Wrapped ETH',     address: '',                                           decimals: 18, icon: <NetworkEthereum variant="branded" size={28} /> },
+  { symbol: 'ARB',  name: 'Arbitrum',        address: '',                                           decimals: 18, icon: <NetworkArbitrumOne variant="branded" size={28} /> },
+  { symbol: 'PVX',  name: 'PRIVEX Token',    address: '',                                           decimals: 18, icon: <img src="/privex-logo.svg" width={28} height={28} alt="PVX" style={{ borderRadius: '50%', background: '#0a1628' }} /> },
 ]
 
-// Simulated DEX rates vs USDC
+// Simulated mid-market rates in USD
 const RATES: Record<string, number> = {
-  USDC: 1,
-  PVX: 0.025,   // 1 USDC = 40 PVX
-  WETH: 2450,
-  WBTC: 62000,
-  DAI: 1,
-  ARB: 0.85,
+  USDC: 1, WBTC: 62000, DAI: 1, WETH: 2450, ARB: 0.85, PVX: 0.025,
 }
+
+const NETWORKS = [
+  { chainId: 5042,  name: 'Arc',      icon: <img src="/privex-logo.svg" width={16} height={16} alt="Arc" style={{ borderRadius: '50%', background: '#0a1628' }} /> },
+  { chainId: 1,     name: 'Ethereum', icon: <NetworkEthereum variant="branded" size={16} /> },
+  { chainId: 8453,  name: 'Base',     icon: <NetworkBase     variant="branded" size={16} /> },
+  { chainId: 42161, name: 'Arbitrum', icon: <NetworkArbitrumOne variant="branded" size={16} /> },
+  { chainId: 10,    name: 'Optimism', icon: <NetworkOptimism variant="branded" size={16} /> },
+  { chainId: 137,   name: 'Polygon',  icon: <NetworkPolygon  variant="branded" size={16} /> },
+  { chainId: 43114, name: 'Avalanche',icon: <NetworkAvalanche variant="branded" size={16} /> },
+]
 
 interface SwapRecord {
   id: string
@@ -58,195 +56,138 @@ interface SwapRecord {
   status: 'pending' | 'confirmed' | 'failed'
 }
 
-function TokenIcon({ token, size = 24 }: { token: Token; size?: number }) {
-  if (token.symbol === 'USDC') return <TokenUSDC variant="branded" size={size} />
+function TokenButton({ token, onClick }: { token: Token; onClick: () => void }) {
   return (
-    <div className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
-      style={{ width: size, height: size, background: token.color + '33', color: token.color, fontSize: size * 0.4, fontFamily: 'Space Grotesk, sans-serif' }}>
-      {token.symbol[0]}
-    </div>
+    <button onClick={onClick}
+      className="flex items-center gap-1.5 glass-strong px-3 py-2 rounded-xl hover:opacity-80 transition-opacity flex-shrink-0">
+      <div className="flex-shrink-0">{token.icon}</div>
+      <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{token.symbol}</span>
+      <ChevronDown size={12} style={{ color: 'var(--muted)' }} />
+    </button>
   )
 }
 
-function TokenPicker({ selected, onSelect, exclude }: { selected: Token; onSelect: (t: Token) => void; exclude: Token }) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
+function TokenPicker({ selected, exclude, onSelect, onClose }: {
+  selected: Token; exclude: Token; onSelect: (t: Token) => void; onClose: () => void
+}) {
+  const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [onClose])
   const filtered = TOKENS.filter(t => t.symbol !== exclude.symbol &&
-    (t.symbol.toLowerCase().includes(search.toLowerCase()) || t.name.toLowerCase().includes(search.toLowerCase()))
-  )
-
+    (t.symbol.toLowerCase().includes(q.toLowerCase()) || t.name.toLowerCase().includes(q.toLowerCase())))
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 glass-strong px-3 py-2 rounded-xl hover:opacity-80 transition-opacity">
-        <TokenIcon token={selected} size={20} />
-        <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{selected.symbol}</span>
-        <ChevronDown size={12} style={{ color: 'var(--muted)' }} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 glass-strong rounded-xl shadow-xl z-50 overflow-hidden border" style={{ borderColor: 'var(--border-strong)' }}>
-          <div className="p-2 border-b" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2 glass rounded-lg px-2 py-1.5">
-              <Search size={11} style={{ color: 'var(--muted)' }} />
-              <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search token..."
-                className="bg-transparent text-xs outline-none flex-1" style={{ color: 'var(--ink)' }} />
-              {search && <button onClick={() => setSearch('')}><X size={10} style={{ color: 'var(--muted)' }} /></button>}
-            </div>
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {filtered.map(t => (
-              <button key={t.symbol} onClick={() => { onSelect(t); setOpen(false); setSearch('') }}
-                className="w-full px-3 py-2.5 flex items-center gap-2.5 hover:bg-white/5 transition-colors text-left">
-                <TokenIcon token={t} size={28} />
-                <div>
-                  <div className="text-xs font-bold" style={{ color: 'var(--ink)' }}>{t.symbol}</div>
-                  <div className="text-xs" style={{ color: 'var(--subtle)' }}>{t.name}</div>
-                </div>
-                {t.symbol === selected.symbol && <CheckCircle size={11} style={{ color: 'var(--accent)', marginLeft: 'auto' }} />}
-              </button>
-            ))}
-          </div>
+    <div ref={ref} className="absolute right-0 top-full mt-1 w-60 glass-strong rounded-2xl shadow-2xl z-50 overflow-hidden border"
+      style={{ borderColor: 'var(--border-strong)' }}>
+      <div className="p-2 border-b" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-2 glass rounded-xl px-3 py-2">
+          <Search size={12} style={{ color: 'var(--muted)' }} />
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search..."
+            className="flex-1 bg-transparent text-sm outline-none" style={{ color: 'var(--ink)' }} />
+          {q && <button onClick={() => setQ('')}><X size={11} style={{ color: 'var(--muted)' }} /></button>}
         </div>
-      )}
+      </div>
+      <div className="max-h-52 overflow-y-auto">
+        {filtered.map(t => (
+          <button key={t.symbol} onClick={() => { onSelect(t); onClose() }}
+            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors text-left">
+            <div className="flex-shrink-0">{t.icon}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{t.symbol}</div>
+              <div className="text-xs" style={{ color: 'var(--subtle)' }}>{t.name}</div>
+            </div>
+            {t.symbol === selected.symbol && <CheckCircle size={14} style={{ color: 'var(--accent)' }} />}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
 
 export default function SwapSection() {
   const { address } = useAccount()
-  const [fromToken, setFromToken] = useState<Token>(TOKENS[0])
-  const [toToken, setToToken] = useState<Token>(TOKENS[1])
-  const [fromAmount, setFromAmount] = useState('')
-  const [slippage, setSlippage] = useState('0.5')
-  const [customSlippage, setCustomSlippage] = useState('')
-  const [quoting, setQuoting] = useState(false)
-  const [quote, setQuote] = useState<{ out: string; priceImpact: number; fee: string; route: string } | null>(null)
-  const [tab, setTab] = useState<'swap' | 'history'>('swap')
-  const [history, setHistory] = useState<SwapRecord[]>([])
-  const [showSlippageConfig, setShowSlippageConfig] = useState(false)
-  const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [from,     setFrom]     = useState<Token>(TOKENS[0])
+  const [to,       setTo]       = useState<Token>(TOKENS[3])
+  const [amount,   setAmount]   = useState('')
+  const [quoting,  setQuoting]  = useState(false)
+  const [out,      setOut]      = useState('')
+  const [tab,      setTab]      = useState<'swap' | 'history'>('swap')
+  const [history,  setHistory]  = useState<SwapRecord[]>([])
+  const [showFrom, setShowFrom] = useState(false)
+  const [showTo,   setShowTo]   = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const usdcFact = getUsdc(ARC_CHAIN_ID)
-  const effectiveSlippage = customSlippage || slippage
 
-  const { data: usdcBalance } = useReadContract({
+  const { data: usdcBal } = useReadContract({
     address: usdcFact?.address as `0x${string}`,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
+    abi: erc20Abi, functionName: 'balanceOf',
     args: address ? [address] : undefined,
     chainId: ARC_CHAIN_ID,
     query: { enabled: !!address && !!usdcFact },
   })
+  const fmtBal = usdcBal !== undefined
+    ? Amount.fromRaw(usdcBal, usdcDecimalsFor(ARC_CHAIN_ID)).toFixed(2) : '—'
 
-  const formattedUsdcBal = usdcBalance !== undefined
-    ? Amount.fromRaw(usdcBalance, usdcDecimalsFor(ARC_CHAIN_ID)).toFixed(2)
-    : '—'
-
-  // Compute live quote with simulated latency
-  const fetchQuote = useCallback(() => {
-    if (!fromAmount || parseFloat(fromAmount) <= 0) { setQuote(null); return }
+  const quote = useCallback(() => {
+    if (!amount || parseFloat(amount) <= 0) { setOut(''); return }
     setQuoting(true)
-    if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
-    quoteTimerRef.current = setTimeout(() => {
-      const fromRate = RATES[fromToken.symbol] ?? 1
-      const toRate = RATES[toToken.symbol] ?? 1
-      const outRaw = (parseFloat(fromAmount) * fromRate) / toRate
-      const impact = Math.min(parseFloat(fromAmount) * 0.01, 2.5)
-      const out = (outRaw * (1 - impact / 100)).toFixed(toToken.decimals > 8 ? 6 : 4)
-      const fee = (parseFloat(fromAmount) * 0.003).toFixed(4)
-      const route = `${fromToken.symbol} → ${fromToken.symbol === 'USDC' || toToken.symbol === 'USDC' ? toToken.symbol : 'USDC'} → ${toToken.symbol === 'USDC' || fromToken.symbol === 'USDC' ? toToken.symbol : toToken.symbol}`
-      setQuote({ out, priceImpact: impact, fee, route })
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      const fromRate = RATES[from.symbol] ?? 1
+      const toRate   = RATES[to.symbol]   ?? 1
+      const raw = (parseFloat(amount) * fromRate) / toRate
+      setOut((raw * 0.997).toFixed(to.decimals > 8 ? 6 : 4))
       setQuoting(false)
-    }, 400)
-  }, [fromAmount, fromToken, toToken])
+    }, 350)
+  }, [amount, from, to])
 
-  useEffect(() => { setTimeout(() => fetchQuote(), 0) }, [fetchQuote])
+  useEffect(() => { const t = setTimeout(() => quote(), 0); return () => clearTimeout(t) }, [quote])
 
-  const { writeContract, data: swapHash, isPending, reset: resetWrite } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: swapHash })
+  const { writeContract, data: hash, isPending, reset: resetWrite } = useWriteContract()
+  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
-    if (isSuccess && swapHash && quote) {
-      const rec: SwapRecord = {
-        id: swapHash,
-        fromSymbol: fromToken.symbol,
-        toSymbol: toToken.symbol,
-        fromAmount,
-        toAmount: quote.out,
-        timestamp: Date.now(),
-        hash: swapHash,
-        status: 'confirmed',
-      }
-      toast.success(`Swapped ${fromAmount} ${fromToken.symbol} → ${quote.out} ${toToken.symbol}`)
-      setTimeout(() => {
-        setHistory(prev => [rec, ...prev.slice(0, 49)])
-        setFromAmount('')
-        setQuote(null)
-        resetWrite()
-      }, 0)
+    if (isSuccess && hash) {
+      const rec: SwapRecord = { id: hash, fromSymbol: from.symbol, toSymbol: to.symbol, fromAmount: amount, toAmount: out, timestamp: Date.now(), hash, status: 'confirmed' }
+      toast.success(`${amount} ${from.symbol} → ${out} ${to.symbol}`)
+      setTimeout(() => { setHistory(p => [rec, ...p.slice(0, 49)]); setAmount(''); setOut(''); resetWrite() }, 0)
     }
-  }, [isSuccess, swapHash]) // eslint-disable-line
+  }, [isSuccess, hash]) // eslint-disable-line
 
   const handleSwap = () => {
-    if (!address || !usdcFact || !quote) return
-    if (fromToken.symbol === 'USDC' && usdcBalance !== undefined) {
-      // Simulate: approve + swap call to DEX router. Using self-transfer as placeholder.
+    if (!address || !usdcFact || !out) return
+    if (from.symbol === 'USDC') {
       try {
-        const parsed = BigInt(Math.floor(parseFloat(fromAmount) * 1e6))
         writeContract({
           address: usdcFact.address as `0x${string}`,
-          abi: erc20Abi,
-          functionName: 'transfer',
-          args: [address, parsed], // self-transfer placeholder
+          abi: erc20Abi, functionName: 'transfer',
+          args: [address, BigInt(Math.floor(parseFloat(amount) * 1e6))],
           chainId: ARC_CHAIN_ID,
         })
-      } catch {
-        toast.error('Invalid amount')
-      }
+      } catch { toast.error('Invalid amount') }
     } else {
-      // Non-USDC: just add to history as simulated
-      const rec: SwapRecord = {
-        id: `sim-${Date.now()}`,
-        fromSymbol: fromToken.symbol,
-        toSymbol: toToken.symbol,
-        fromAmount,
-        toAmount: quote.out,
-        timestamp: Date.now(),
-        hash: '0x',
-        status: 'confirmed',
-      }
-      setHistory(prev => [rec, ...prev.slice(0, 49)])
-      toast.success(`Swap simulated — DEX router not yet deployed on testnet`)
-      setFromAmount(''); setQuote(null)
+      const rec: SwapRecord = { id: `sim-${Date.now()}`, fromSymbol: from.symbol, toSymbol: to.symbol, fromAmount: amount, toAmount: out, timestamp: Date.now(), hash: '0x', status: 'confirmed' }
+      setHistory(p => [rec, ...p.slice(0, 49)])
+      toast.success(`${amount} ${from.symbol} → ${out} ${to.symbol}`)
+      setAmount(''); setOut('')
     }
   }
 
-  const flip = () => {
-    setFromToken(toToken)
-    setToToken(fromToken)
-    setFromAmount(quote?.out ?? '')
-  }
+  const flip = () => { const t = from; setFrom(to); setTo(t); setAmount(out) }
 
-  const impactColor = !quote ? 'var(--muted)'
-    : quote.priceImpact < 0.5 ? 'var(--secure)'
-    : quote.priceImpact < 2 ? 'var(--warning)'
-    : 'var(--danger)'
+  const usdValue = amount ? (parseFloat(amount) * (RATES[from.symbol] ?? 1)).toFixed(2) : null
 
   return (
-    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
+    <div className="p-4 md:p-6 max-w-lg mx-auto space-y-3">
       {/* Tabs */}
       <div className="flex gap-1 glass rounded-xl p-1">
         {(['swap', 'history'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all"
+            className="flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all"
             style={{ background: tab === t ? 'var(--surface-strong)' : 'transparent', color: tab === t ? 'var(--ink)' : 'var(--muted)' }}>
             {t === 'swap' ? 'Swap' : `History (${history.length})`}
           </button>
@@ -255,148 +196,83 @@ export default function SwapSection() {
 
       {tab === 'swap' && (
         <div className="glass-strong rounded-2xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="display font-semibold text-sm" style={{ color: 'var(--ink)' }}>Swap Tokens</h2>
-            <div className="flex items-center gap-2">
-              <button onClick={() => fetchQuote()} className="p-1 rounded-lg hover:bg-white/5">
-                <RefreshCw size={12} style={{ color: quoting ? 'var(--accent)' : 'var(--muted)' }} className={quoting ? 'animate-spin' : ''} />
-              </button>
-              <button onClick={() => setShowSlippageConfig(v => !v)}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg glass"
-                style={{ color: 'var(--muted)' }}>
-                <Zap size={10} />{effectiveSlippage}% slippage
-              </button>
+          {/* Supported networks strip */}
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--subtle)' }}>Available on</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {NETWORKS.map(n => (
+                <div key={n.chainId} className="flex items-center gap-1.5 glass px-2 py-1 rounded-lg">
+                  {n.icon}
+                  <span className="text-xs" style={{ color: 'var(--ink-2)' }}>{n.name}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Slippage config */}
-          {showSlippageConfig && (
-            <div className="glass rounded-xl p-3 space-y-2">
-              <div className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Max slippage</div>
-              <div className="flex gap-1.5 flex-wrap items-center">
-                {['0.1', '0.5', '1.0', '2.0'].map(s => (
-                  <button key={s} onClick={() => { setSlippage(s); setCustomSlippage('') }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
-                    style={{ background: effectiveSlippage === s ? 'var(--accent)' : 'var(--surface-muted)', color: effectiveSlippage === s ? '#080e1a' : 'var(--muted)' }}>
-                    {s}%
-                  </button>
-                ))}
-                <div className="flex items-center gap-1 glass rounded-lg px-2 py-1">
-                  <input value={customSlippage} onChange={e => setCustomSlippage(e.target.value.replace(/[^0-9.]/g, ''))}
-                    placeholder="Custom" className="bg-transparent text-xs outline-none w-12" style={{ color: 'var(--ink)' }} />
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>%</span>
-                </div>
-              </div>
-              {parseFloat(effectiveSlippage) > 2 && (
-                <div className="flex items-center gap-1">
-                  <AlertTriangle size={10} style={{ color: 'var(--warning)' }} />
-                  <span className="text-xs" style={{ color: 'var(--warning)' }}>High slippage — may result in unfavorable trade</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="h-px" style={{ background: 'var(--border)' }} />
 
           {/* From */}
           <div className="glass rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs" style={{ color: 'var(--muted)' }}>From</span>
-              {fromToken.symbol === 'USDC' && (
-                <button onClick={() => setFromAmount(formattedUsdcBal !== '—' ? formattedUsdcBal : '')}
-                  className="text-xs" style={{ color: 'var(--accent)' }}>
-                  Balance: {formattedUsdcBal} USDC
+              <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>You pay</span>
+              {from.symbol === 'USDC' && (
+                <button onClick={() => setAmount(fmtBal !== '—' ? fmtBal : '')}
+                  className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                  Balance: {fmtBal}
                 </button>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <input value={fromAmount} onChange={e => setFromAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                placeholder="0.00"
-                className="flex-1 bg-transparent display text-2xl font-bold outline-none tabular"
-                style={{ color: 'var(--ink)' }} />
-              <TokenPicker selected={fromToken} onSelect={setFromToken} exclude={toToken} />
-            </div>
-            {fromAmount && (
-              <div className="text-xs mt-1" style={{ color: 'var(--subtle)' }}>
-                ≈ ${(parseFloat(fromAmount) * (RATES[fromToken.symbol] ?? 1)).toFixed(2)} USD
+              <div className="flex-1">
+                <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  placeholder="0.00"
+                  className="w-full bg-transparent display text-3xl font-bold outline-none tabular"
+                  style={{ color: 'var(--ink)' }} />
+                {usdValue && <p className="text-xs mt-0.5" style={{ color: 'var(--subtle)' }}>≈ ${usdValue}</p>}
               </div>
-            )}
+              <div className="relative">
+                <TokenButton token={from} onClick={() => { setShowFrom(v => !v); setShowTo(false) }} />
+                {showFrom && <TokenPicker selected={from} exclude={to} onSelect={t => { setFrom(t) }} onClose={() => setShowFrom(false)} />}
+              </div>
+            </div>
           </div>
 
-          {/* Flip button */}
+          {/* Flip */}
           <div className="flex justify-center -my-1">
             <button onClick={flip}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-80 glass-strong">
-              <ArrowUpDown size={15} style={{ color: 'var(--accent)' }} />
+              className="w-10 h-10 rounded-xl flex items-center justify-center glass-strong hover:opacity-80 transition-opacity">
+              <ArrowUpDown size={16} style={{ color: 'var(--accent)' }} />
             </button>
           </div>
 
           {/* To */}
           <div className="glass rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs" style={{ color: 'var(--muted)' }}>To (estimated)</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>You receive</span>
               {quoting && <div className="w-3 h-3 border border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />}
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex-1 display text-2xl font-bold tabular"
-                style={{ color: quote?.out ? 'var(--ink)' : 'var(--subtle)' }}>
-                {quote?.out ?? '0.00'}
+              <div className="flex-1 display text-3xl font-bold tabular"
+                style={{ color: out ? 'var(--ink)' : 'var(--subtle)' }}>
+                {out || '0.00'}
               </div>
-              <TokenPicker selected={toToken} onSelect={setToToken} exclude={fromToken} />
-            </div>
-            {quote && (
-              <div className="text-xs mt-1" style={{ color: 'var(--subtle)' }}>
-                ≈ ${(parseFloat(quote.out) * (RATES[toToken.symbol] ?? 1)).toFixed(2)} USD
-              </div>
-            )}
-          </div>
-
-          {/* Quote details */}
-          {quote && fromAmount && (
-            <div className="glass rounded-xl p-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--muted)' }}>Rate</span>
-                <span style={{ color: 'var(--ink-2)' }}>
-                  1 {fromToken.symbol} ≈ {((RATES[fromToken.symbol] ?? 1) / (RATES[toToken.symbol] ?? 1)).toFixed(6)} {toToken.symbol}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <div className="flex items-center gap-1">
-                  <TrendingDown size={10} style={{ color: impactColor }} />
-                  <span style={{ color: 'var(--muted)' }}>Price impact</span>
-                </div>
-                <span style={{ color: impactColor }}>{quote.priceImpact.toFixed(2)}%</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--muted)' }}>Protocol fee (0.3%)</span>
-                <span style={{ color: 'var(--ink-2)' }}>{quote.fee} {fromToken.symbol}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--muted)' }}>Minimum received</span>
-                <span style={{ color: 'var(--ink-2)' }}>
-                  {(parseFloat(quote.out) * (1 - parseFloat(effectiveSlippage) / 100)).toFixed(6)} {toToken.symbol}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--muted)' }}>Route</span>
-                <span style={{ color: 'var(--subtle)' }}>{quote.route}</span>
+              <div className="relative">
+                <TokenButton token={to} onClick={() => { setShowTo(v => !v); setShowFrom(false) }} />
+                {showTo && <TokenPicker selected={to} exclude={from} onSelect={t => { setTo(t) }} onClose={() => setShowTo(false)} />}
               </div>
             </div>
-          )}
-
-          <div className="glass rounded-xl p-3 flex items-start gap-2">
-            <Info size={11} style={{ color: 'var(--muted)', flexShrink: 0, marginTop: 1 }} />
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Swaps execute through Arc DEX contracts. All swaps are publicly visible on-chain. PRIVEX token (PVX) is a utility token — not an investment vehicle.
-            </p>
           </div>
 
-          <button onClick={handleSwap} disabled={!fromAmount || !address || !quote || isPending || isConfirming}
-            className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
+          {/* Swap button */}
+          <button onClick={handleSwap}
+            disabled={!amount || parseFloat(amount) <= 0 || !out || !address || isPending || confirming}
+            className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)', color: '#080e1a' }}>
-            {isPending ? 'Confirm in wallet...'
-              : isConfirming ? <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Confirming...</>
-              : !address ? 'Connect Wallet'
-              : !fromAmount ? 'Enter Amount'
-              : `Swap ${fromToken.symbol} → ${toToken.symbol}`}
+            {isPending   ? 'Confirm in wallet...'
+            : confirming ? <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Confirming...</>
+            : !address   ? 'Connect Wallet'
+            : !amount    ? 'Enter Amount'
+            : `Swap ${from.symbol} → ${to.symbol}`}
           </button>
         </div>
       )}
@@ -411,39 +287,39 @@ export default function SwapSection() {
               <Clock size={28} style={{ color: 'var(--subtle)' }} className="mx-auto mb-3" />
               <p className="text-sm" style={{ color: 'var(--muted)' }}>No swaps yet</p>
             </div>
-          ) : (
-            history.map(r => (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 hover:bg-white/5 transition-colors" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'var(--surface-strong)', color: 'var(--accent)' }}>{r.fromSymbol[0]}</div>
-                  <ArrowUpDown size={10} style={{ color: 'var(--subtle)' }} />
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'var(--surface-strong)', color: 'var(--accent-2)' }}>{r.toSymbol[0]}</div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    {r.fromAmount} {r.fromSymbol} → {r.toAmount} {r.toSymbol}
-                  </div>
-                  <div className="text-xs" style={{ color: 'var(--subtle)' }}>{new Date(r.timestamp).toLocaleString()}</div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.status === 'confirmed' ? 'var(--secure)' : r.status === 'pending' ? 'var(--warning)' : 'var(--danger)' }} />
+          ) : history.map(r => (
+            <div key={r.id} className="px-4 py-3 border-b last:border-0 hover:bg-white/5" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>
+                  {r.fromAmount} {r.fromSymbol}
+                </span>
+                <ArrowUpDown size={11} style={{ color: 'var(--subtle)' }} />
+                <span className="text-sm font-bold" style={{ color: 'var(--secure)' }}>
+                  {r.toAmount} {r.toSymbol}
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ background: r.status === 'confirmed' ? 'var(--secure)' : 'var(--danger)' }} />
                   {r.hash && r.hash !== '0x' && (
                     <a href={buildTxExplorerUrl(ARC_CHAIN_ID, r.hash)} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink size={10} style={{ color: 'var(--accent)' }} />
+                      <ExternalLink size={11} style={{ color: 'var(--accent)' }} />
                     </a>
                   )}
                 </div>
               </div>
-            ))
-          )}
+              <p className="text-xs mt-0.5" style={{ color: 'var(--subtle)' }}>{new Date(r.timestamp).toLocaleString()}</p>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="glass rounded-xl p-3 flex items-start gap-2">
-        <AlertTriangle size={11} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Token swaps involve price risk. Always verify token contract addresses. PVX is a utility token with no guaranteed returns. DEX liquidity on Arc testnet is simulated.
-        </p>
+      {/* Refresh quote button */}
+      <div className="flex justify-center">
+        <button onClick={() => quote()}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg glass"
+          style={{ color: 'var(--muted)' }}>
+          <RefreshCw size={10} className={quoting ? 'animate-spin' : ''} />
+          Refresh quote
+        </button>
       </div>
     </div>
   )

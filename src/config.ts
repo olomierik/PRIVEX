@@ -1,14 +1,13 @@
 /**
- * wagmi configuration — PRIVEX
+ * wagmi / ConnectKit configuration — PRIVEX
  */
-
-import { http, createConfig } from 'wagmi'
-import { mainnet } from 'wagmi/chains'
+import { getDefaultConfig } from 'connectkit'
+import { createConfig, http } from 'wagmi'
+import { mainnet, base, arbitrum, optimism, polygon, avalanche } from 'wagmi/chains'
 import { arc } from 'viem/chains'
-import { injected, walletConnect } from 'wagmi/connectors'
 import { registerChain } from './tracing'
 
-// Pre-register chain RPC URLs
+// Pre-register chain RPC URLs for tracing
 registerChain(arc.id, arc.rpcUrls.default.http[0])
 
 /** Arc Mainnet chain ID */
@@ -31,29 +30,30 @@ export const ACCESS_MANAGER_ADDRESS = (import.meta.env.VITE_ACCESS_MANAGER_ADDRE
 export const PRIVEX_TOKEN_ADDRESS = (import.meta.env.VITE_PRIVEX_TOKEN_ADDRESS ?? '') as `0x${string}`
 
 /** WalletConnect / Reown project ID — set VITE_WALLETCONNECT_PROJECT_ID in .env */
-const WC_PROJECT_ID = (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string) ?? ''
+export const WC_PROJECT_ID = (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined) ?? ''
 
-const connectors = WC_PROJECT_ID
-  ? [
-      injected(),
-      walletConnect({
-        projectId: WC_PROJECT_ID,
-        metadata: {
-          name: 'PRIVEX',
-          description: 'Private, encrypted communications and onchain payments',
-          url: 'https://privex.world',
-          icons: ['https://privex.world/privex-logo.svg'],
-        },
-        showQrModal: true,
-      }),
-    ]
-  : [injected()]
+/**
+ * All chains the app supports for bridge/swap/payments.
+ * Arc is first so it is the default.
+ */
+const SUPPORTED_CHAINS = [arc, mainnet, base, arbitrum, optimism, polygon, avalanche] as const
 
-export const config = createConfig({
-  chains: [arc, mainnet],
-  connectors,
-  transports: {
-    [arc.id]: http('https://rpc.mainnet.arc.io'),
-    [mainnet.id]: http(),
-  },
-})
+export const config = createConfig(
+  getDefaultConfig({
+    chains: SUPPORTED_CHAINS,
+    transports: {
+      [arc.id]:       http('https://rpc.mainnet.arc.io'),
+      [mainnet.id]:   http(),
+      [base.id]:      http(),
+      [arbitrum.id]:  http(),
+      [optimism.id]:  http(),
+      [polygon.id]:   http(),
+      [avalanche.id]: http(),
+    },
+    walletConnectProjectId: WC_PROJECT_ID,
+    appName: 'PRIVEX',
+    appDescription: 'Private, encrypted communications and onchain payments',
+    appUrl: 'https://privex.world',
+    appIcon: 'https://privex.world/privex-logo.svg',
+  }),
+)

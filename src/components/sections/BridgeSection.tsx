@@ -1,13 +1,10 @@
-/**
- * PRIVEX Bridge — Real CCTP via Circle App Kit + wagmi adapter.
- * Supports Arc ↔ ETH ↔ Base ↔ Arbitrum on mainnet.
- */
 import { useState, useEffect, useRef } from 'react'
-import {
-  Globe, ArrowRight, Info, AlertTriangle,
-  CheckCircle, XCircle, ExternalLink, RefreshCw, Activity, Lock,
-} from 'lucide-react'
+import { ArrowRight, CheckCircle, XCircle, RefreshCw, Clock, ExternalLink } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
+import {
+  NetworkEthereum, NetworkBase, NetworkArbitrumOne,
+  NetworkOptimism, NetworkPolygon, NetworkAvalanche,
+} from '@web3icons/react'
 import { useAccount, useReadContract, useSwitchChain } from 'wagmi'
 import { erc20Abi } from 'viem'
 import type { EIP1193Provider } from 'viem'
@@ -18,21 +15,35 @@ import { ONCHAIN_CHAINS, getUsdc, buildTxExplorerUrl } from '@/onchain-facts'
 import { Amount, usdcDecimalsFor } from '@/onchain-money'
 import { toast } from 'sonner'
 
-// Mainnet chains with USDC and CCTP domain
-const BRIDGE_CHAINS = ONCHAIN_CHAINS.filter(
-  c => !c.isTestnet && c.usdc && c.cctpDomain !== undefined
-)
-
-// Chain name strings as expected by App Kit BridgeChain enum
-const CHAIN_NAME_MAP: Record<number, string> = {
-  5042: 'Arc',
-  1: 'Ethereum',
-  8453: 'Base',
+// Chains supported by the bridge
+const CHAIN_KIT_NAME: Record<number, string> = {
+  5042:  'Arc',
+  1:     'Ethereum',
+  8453:  'Base',
   42161: 'Arbitrum',
-  10: 'OP_Mainnet',
-  137: 'Polygon',
+  10:    'OP_Mainnet',
+  137:   'Polygon',
   43114: 'Avalanche',
 }
+
+function ChainIcon({ chainId, size = 24 }: { chainId: number; size?: number }) {
+  const cls = `flex-shrink-0 rounded-full overflow-hidden`
+  const s = size
+  if (chainId === 5042) return (
+    <img src="/privex-logo.svg" width={s} height={s} alt="Arc" className={cls} style={{ borderRadius: '50%', background: '#0a1628' }} />
+  )
+  if (chainId === 1)     return <NetworkEthereum variant="branded" size={s} className={cls} />
+  if (chainId === 8453)  return <NetworkBase variant="branded" size={s} className={cls} />
+  if (chainId === 42161) return <NetworkArbitrumOne variant="branded" size={s} className={cls} />
+  if (chainId === 10)    return <NetworkOptimism variant="branded" size={s} className={cls} />
+  if (chainId === 137)   return <NetworkPolygon variant="branded" size={s} className={cls} />
+  if (chainId === 43114) return <NetworkAvalanche variant="branded" size={s} className={cls} />
+  return <div className={cls} style={{ width: s, height: s, background: 'var(--surface-strong)' }} />
+}
+
+const BRIDGE_CHAINS = ONCHAIN_CHAINS.filter(
+  c => !c.isTestnet && c.usdc && CHAIN_KIT_NAME[c.chainId] !== undefined
+)
 
 const appKit = new AppKit()
 
@@ -41,7 +52,9 @@ type BridgeStatus = 'idle' | 'approving' | 'burning' | 'attesting' | 'minting' |
 interface BridgeRecord {
   id: string
   fromChain: string
+  fromChainId: number
   toChain: string
+  toChainId: number
   amount: string
   status: BridgeStatus
   srcHash?: string
@@ -49,39 +62,31 @@ interface BridgeRecord {
   timestamp: number
 }
 
-const STATUS_STEPS: { status: BridgeStatus; label: string; desc: string }[] = [
-  { status: 'approving', label: 'Approve USDC', desc: 'Authorizing CCTP to burn USDC' },
-  { status: 'burning', label: 'Burn on source', desc: 'Burning USDC on source chain' },
-  { status: 'attesting', label: 'Circle attestation', desc: 'Circle validators sign the burn proof (~20s)' },
-  { status: 'minting', label: 'Mint on destination', desc: 'Minting native USDC on destination' },
-  { status: 'done', label: 'Complete', desc: 'USDC arrived on destination chain' },
+const STEPS: { status: BridgeStatus; label: string }[] = [
+  { status: 'approving', label: 'Authorizing' },
+  { status: 'burning',   label: 'Sending' },
+  { status: 'attesting', label: 'Verifying' },
+  { status: 'minting',   label: 'Receiving' },
+  { status: 'done',      label: 'Complete' },
 ]
-const STATUS_ORDER: BridgeStatus[] = ['approving', 'burning', 'attesting', 'minting', 'done', 'failed']
+const STEP_ORDER: BridgeStatus[] = ['approving', 'burning', 'attesting', 'minting', 'done', 'failed']
 
-function StepIndicator({ current }: { current: BridgeStatus }) {
-  const currentIdx = STATUS_ORDER.indexOf(current)
+function StepBar({ current }: { current: BridgeStatus }) {
+  const ci = STEP_ORDER.indexOf(current)
   return (
-    <div className="space-y-2">
-      {STATUS_STEPS.map((step, i) => {
-        const stepIdx = STATUS_ORDER.indexOf(step.status)
-        const done = currentIdx > stepIdx && current !== 'failed'
+    <div className="flex items-center gap-1.5">
+      {STEPS.map((step, i) => {
+        const si = STEP_ORDER.indexOf(step.status)
+        const done   = ci > si && current !== 'failed'
         const active = current === step.status
         return (
-          <div key={step.status} className="flex items-start gap-3">
-            <div className="flex flex-col items-center flex-shrink-0 mt-0.5">
-              <div className="w-5 h-5 rounded-full flex items-center justify-center"
-                style={{ background: done ? 'var(--secure)' : active ? 'var(--accent)' : 'var(--surface-muted)' }}>
-                {done ? <CheckCircle size={11} style={{ color: '#080e1a' }} />
-                  : current === 'failed' && active ? <XCircle size={11} style={{ color: 'white' }} />
-                  : active ? <div className="w-2 h-2 border border-[#080e1a]/30 border-t-[#080e1a] rounded-full animate-spin" />
-                  : <div className="w-2 h-2 rounded-full" style={{ background: 'var(--subtle)' }} />}
-              </div>
-              {i < STATUS_STEPS.length - 1 && <div className="w-px mt-1" style={{ height: 12, background: done ? 'var(--secure)' : 'var(--border)' }} />}
-            </div>
-            <div className="flex-1 pb-1">
-              <div className="text-xs font-semibold" style={{ color: done || active ? 'var(--ink)' : 'var(--subtle)' }}>{step.label}</div>
-              {(done || active) && <div className="text-xs" style={{ color: 'var(--muted)' }}>{step.desc}</div>}
-            </div>
+          <div key={step.status} className="flex-1 flex flex-col items-center gap-1">
+            <div className="w-full h-1 rounded-full transition-all"
+              style={{ background: done ? 'var(--secure)' : active ? 'var(--accent)' : 'var(--surface-muted)' }} />
+            <span className="text-[10px] font-medium" style={{ color: done || active ? 'var(--ink-2)' : 'var(--subtle)' }}>
+              {done ? <CheckCircle size={8} style={{ color: 'var(--secure)', display: 'inline' }} /> : step.label}
+            </span>
+            {i < STEPS.length - 1 && <div />}
           </div>
         )
       })}
@@ -94,21 +99,23 @@ export default function BridgeSection() {
   const { switchChainAsync } = useSwitchChain()
 
   const defaultFrom = BRIDGE_CHAINS.find(c => c.chainId === 5042) ?? BRIDGE_CHAINS[0]
-  const defaultTo = BRIDGE_CHAINS.find(c => c.chainId === 8453) ?? BRIDGE_CHAINS[1]
+  const defaultTo   = BRIDGE_CHAINS.find(c => c.chainId === 8453) ?? BRIDGE_CHAINS[1]
 
   const [fromChain, setFromChain] = useState(defaultFrom)
-  const [toChain, setToChain] = useState(defaultTo)
-  const [amount, setAmount] = useState('')
-  const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>('idle')
-  const [history, setHistory] = useState<BridgeRecord[]>([])
-  const [tab, setTab] = useState<'bridge' | 'history'>('bridge')
-  const [elapsed, setElapsed] = useState(0)
-  const [srcHash, setSrcHash] = useState<string | undefined>()
-  const [dstHash, setDstHash] = useState<string | undefined>()
-  const bridgeResultRef = useRef<BridgeResult | null>(null)
+  const [toChain,   setToChain]   = useState(defaultTo)
+  const [amount,    setAmount]    = useState('')
+  const [status,    setStatus]    = useState<BridgeStatus>('idle')
+  const [history,   setHistory]   = useState<BridgeRecord[]>([])
+  const [tab,       setTab]       = useState<'bridge' | 'history'>('bridge')
+  const [elapsed,   setElapsed]   = useState(0)
+  const [srcHash,   setSrcHash]   = useState<string | undefined>()
+  const [dstHash,   setDstHash]   = useState<string | undefined>()
+  const resultRef = useRef<BridgeResult | null>(null)
 
-  const usdcFact = getUsdc(fromChain?.chainId ?? 5042)
-  const isWrongChain = chainId !== fromChain?.chainId
+  const usdcFact    = getUsdc(fromChain?.chainId ?? 5042)
+  // Only show wrong-chain warning when wallet is connected
+  const isWrongChain = !!address && chainId !== fromChain?.chainId
+  const isBridging   = status !== 'idle' && status !== 'done' && status !== 'failed'
 
   const { data: balance } = useReadContract({
     address: usdcFact?.address as `0x${string}`,
@@ -118,102 +125,70 @@ export default function BridgeSection() {
     chainId: fromChain?.chainId,
     query: { enabled: !!address && !!usdcFact },
   })
-
-  const formattedBalance = balance !== undefined
+  const fmtBalance = balance !== undefined
     ? Amount.fromRaw(balance, usdcDecimalsFor(fromChain?.chainId ?? 5042)).toFixed(2)
     : '—'
 
-  const isBridging = bridgeStatus !== 'idle' && bridgeStatus !== 'done' && bridgeStatus !== 'failed'
-
-  // Elapsed timer
   useEffect(() => {
     if (!isBridging) { const t = setTimeout(() => setElapsed(0), 0); return () => clearTimeout(t) }
     const iv = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(iv)
   }, [isBridging])
 
+  const swap = () => { const t = fromChain; setFromChain(toChain); setToChain(t) }
+
   const startBridge = async () => {
-    if (!address || !connector) { toast.error('Connect wallet first'); return }
+    if (!address || !connector) { toast.error('Connect your wallet first'); return }
     if (!amount || parseFloat(amount) <= 0) { toast.error('Enter an amount'); return }
-    if (!fromChain || !toChain || fromChain.chainId === toChain.chainId) { toast.error('Select different chains'); return }
+    if (fromChain.chainId === toChain.chainId) { toast.error('Choose different networks'); return }
+    const fromName = CHAIN_KIT_NAME[fromChain.chainId]
+    const toName   = CHAIN_KIT_NAME[toChain.chainId]
+    if (!fromName || !toName) { toast.error('Network not supported'); return }
 
-    const fromChainName = CHAIN_NAME_MAP[fromChain.chainId]
-    const toChainName = CHAIN_NAME_MAP[toChain.chainId]
-    if (!fromChainName || !toChainName) { toast.error('Chain not supported by bridge'); return }
+    setSrcHash(undefined); setDstHash(undefined); setStatus('approving')
 
-    setSrcHash(undefined)
-    setDstHash(undefined)
-    setBridgeStatus('approving')
+    const onApprove = () => setStatus('approving')
+    const onBurn    = (p: { values?: { txHash?: string } }) => { setStatus('burning');   if (p?.values?.txHash) setSrcHash(p.values.txHash) }
+    const onAttest  = () => setStatus('attesting')
+    const onMint    = (p: { values?: { txHash?: string } }) => { setStatus('minting');   if (p?.values?.txHash) setDstHash(p.values.txHash) }
 
-    // Register step listeners
-    const onApprove = () => setBridgeStatus('approving')
-    const onBurn = (payload: { values?: { txHash?: string } }) => {
-      setBridgeStatus('burning')
-      if (payload?.values?.txHash) setSrcHash(payload.values.txHash)
-    }
-    const onAttest = () => setBridgeStatus('attesting')
-    const onMint = (payload: { values?: { txHash?: string } }) => {
-      setBridgeStatus('minting')
-      if (payload?.values?.txHash) setDstHash(payload.values.txHash)
-    }
-
-    // oxlint-disable-next-line typescript/no-unsafe-argument -- App Kit event API requires cast
+    // oxlint-disable-next-line typescript/no-unsafe-argument
     appKit.on('bridge.approve' as never, onApprove)
-    // oxlint-disable-next-line typescript/no-unsafe-argument -- App Kit event API requires cast
+    // oxlint-disable-next-line typescript/no-unsafe-argument
     appKit.on('bridge.burn' as never, onBurn as never)
-    // oxlint-disable-next-line typescript/no-unsafe-argument -- App Kit event API requires cast
+    // oxlint-disable-next-line typescript/no-unsafe-argument
     appKit.on('bridge.fetchAttestation' as never, onAttest)
-    // oxlint-disable-next-line typescript/no-unsafe-argument -- App Kit event API requires cast
+    // oxlint-disable-next-line typescript/no-unsafe-argument
     appKit.on('bridge.mint' as never, onMint as never)
 
     try {
-      if (chainId !== fromChain.chainId) {
-        await switchChainAsync({ chainId: fromChain.chainId })
-      }
-
+      if (chainId !== fromChain.chainId) await switchChainAsync({ chainId: fromChain.chainId })
       const provider = await connector.getProvider() as EIP1193Provider
-      const adapter = await createViemAdapterFromProvider({ provider })
-
-      const result = await appKit.bridge({
-        from: { adapter, chain: fromChainName as Parameters<typeof appKit.bridge>[0]['from']['chain'] },
-        to: { adapter, chain: toChainName as Parameters<typeof appKit.bridge>[0]['from']['chain'] },
+      const adapter  = await createViemAdapterFromProvider({ provider })
+      const result   = await appKit.bridge({
+        from: { adapter, chain: fromName as Parameters<typeof appKit.bridge>[0]['from']['chain'] },
+        to:   { adapter, chain: toName   as Parameters<typeof appKit.bridge>[0]['from']['chain'] },
         amount,
       })
-
-      bridgeResultRef.current = result
-
+      resultRef.current = result
+      const rec: BridgeRecord = {
+        id: `bridge-${Date.now()}`,
+        fromChain: fromChain.name, fromChainId: fromChain.chainId,
+        toChain: toChain.name,     toChainId: toChain.chainId,
+        amount, status: result.state === 'success' ? 'done' : 'failed',
+        srcHash, dstHash, timestamp: Date.now(),
+      }
+      setHistory(prev => [rec, ...prev])
       if (result.state === 'success') {
-        setBridgeStatus('done')
-        const rec: BridgeRecord = {
-          id: `bridge-${Date.now()}`,
-          fromChain: fromChain.name,
-          toChain: toChain.name,
-          amount,
-          status: 'done',
-          srcHash,
-          dstHash,
-          timestamp: Date.now(),
-        }
-        setHistory(prev => [rec, ...prev])
-        toast.success(`Bridged ${amount} USDC to ${toChain.name}!`)
+        setStatus('done')
+        toast.success(`${amount} USDC sent to ${toChain.name}`)
       } else {
-        setBridgeStatus('failed')
-        const rec: BridgeRecord = {
-          id: `bridge-${Date.now()}`,
-          fromChain: fromChain.name,
-          toChain: toChain.name,
-          amount,
-          status: 'failed',
-          timestamp: Date.now(),
-        }
-        setHistory(prev => [rec, ...prev])
-        toast.error('Bridge failed — you can retry below')
+        setStatus('failed')
+        toast.error('Transfer failed — tap Retry to continue')
       }
     } catch (err) {
-      setBridgeStatus('failed')
-      const msg = err instanceof Error ? err.message : 'Bridge failed'
-      toast.error(msg)
-      console.error('[PRIVEX Bridge]', err)
+      setStatus('failed')
+      toast.error(err instanceof Error ? err.message : 'Transfer failed')
     } finally {
       // oxlint-disable-next-line typescript/no-unsafe-argument
       appKit.off('bridge.approve' as never, onApprove)
@@ -227,203 +202,207 @@ export default function BridgeSection() {
   }
 
   const retryBridge = async () => {
-    if (!bridgeResultRef.current || !connector) return
+    if (!resultRef.current || !connector) return
     const provider = await connector.getProvider() as EIP1193Provider
-    const adapter = await createViemAdapterFromProvider({ provider })
-    setBridgeStatus('attesting')
+    const adapter  = await createViemAdapterFromProvider({ provider })
+    setStatus('attesting')
     try {
-      const result = await appKit.retryBridge(bridgeResultRef.current, {
-        from: adapter,
-        to: adapter,
-      })
-      if (result.state === 'success') {
-        setBridgeStatus('done')
-        toast.success('Bridge complete after retry!')
-      } else {
-        toast.error('Retry did not succeed')
-      }
-    } catch {
-      toast.error('Retry failed')
-    }
+      const result = await appKit.retryBridge(resultRef.current, { from: adapter, to: adapter })
+      if (result.state === 'success') { setStatus('done'); toast.success('Transfer complete!') }
+      else toast.error('Retry did not succeed')
+    } catch { toast.error('Retry failed') }
   }
 
-  const resetBridge = () => {
-    setBridgeStatus('idle')
-    setAmount('')
-    setSrcHash(undefined)
-    setDstHash(undefined)
-    bridgeResultRef.current = null
-  }
+  const reset = () => { setStatus('idle'); setAmount(''); setSrcHash(undefined); setDstHash(undefined); resultRef.current = null }
 
-  const fee = amount ? (parseFloat(amount) * 0.001).toFixed(4) : '—'
   const received = amount ? (parseFloat(amount) * 0.999).toFixed(4) : '—'
 
-  if (!fromChain || !toChain) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[60vh]">
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>No supported mainnet bridge chains found</p>
-      </div>
-    )
-  }
+  if (!fromChain || !toChain) return (
+    <div className="flex items-center justify-center h-64">
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>No supported networks found</p>
+    </div>
+  )
 
   return (
-    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
-      {/* Tabs */}
+    <div className="p-4 md:p-6 max-w-lg mx-auto space-y-3">
+      {/* Tab bar */}
       <div className="flex gap-1 glass rounded-xl p-1">
         {(['bridge', 'history'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all"
+            className="flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all"
             style={{ background: tab === t ? 'var(--surface-strong)' : 'transparent', color: tab === t ? 'var(--ink)' : 'var(--muted)' }}>
-            {t === 'bridge' ? 'Bridge' : `History (${history.length})`}
+            {t === 'bridge' ? 'Send' : `History (${history.length})`}
           </button>
         ))}
       </div>
 
       {tab === 'bridge' && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="glass-strong rounded-2xl p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <Globe size={16} style={{ color: 'var(--accent)' }} />
-              <h2 className="display font-semibold text-sm" style={{ color: 'var(--ink)' }}>Cross-Chain Bridge</h2>
-              <div className="flex items-center gap-1 ml-auto glass px-2 py-0.5 rounded-full">
-                <Lock size={8} style={{ color: 'var(--secure)' }} />
-                <span className="text-xs" style={{ color: 'var(--secure)', fontSize: '10px' }}>Circle CCTP v2</span>
-              </div>
-            </div>
 
-            {/* Wrong chain warning */}
-            {isWrongChain && bridgeStatus === 'idle' && (
-              <div className="glass rounded-xl p-3 flex items-center gap-2">
-                <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />
-                <span className="text-xs" style={{ color: 'var(--warning)' }}>Switch to {fromChain.name} to bridge</span>
-                <button onClick={() => { void switchChainAsync({ chainId: fromChain.chainId }) }} className="ml-auto text-xs font-semibold" style={{ color: 'var(--accent)' }}>Switch</button>
+            {/* Wrong chain warning — only if wallet is connected AND on wrong chain */}
+            {isWrongChain && status === 'idle' && (
+              <div className="flex items-center gap-3 glass rounded-xl px-3 py-2.5"
+                style={{ borderLeft: '2px solid var(--warning)' }}>
+                <span className="text-sm flex-1" style={{ color: 'var(--ink-2)' }}>
+                  Switch to {fromChain.name} to send from there
+                </span>
+                <button onClick={() => { void switchChainAsync({ chainId: fromChain.chainId }) }}
+                  className="text-xs font-bold px-2.5 py-1 rounded-lg"
+                  style={{ background: 'var(--warning)', color: '#080e1a' }}>
+                  Switch
+                </button>
               </div>
             )}
 
-            {bridgeStatus === 'idle' && (
+            {status === 'idle' && (
               <>
-                {/* Chain selector */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 glass rounded-xl p-3">
-                    <div className="text-xs mb-1.5" style={{ color: 'var(--muted)' }}>From</div>
+                {/* Network selector */}
+                <div className="grid grid-cols-[1fr_40px_1fr] items-center gap-2">
+                  {/* From */}
+                  <div className="glass rounded-xl p-3 space-y-2">
+                    <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>From</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <ChainIcon chainId={fromChain.chainId} size={22} />
+                      <span className="text-sm font-bold truncate" style={{ color: 'var(--ink)' }}>{fromChain.name}</span>
+                    </div>
                     <select value={fromChain.chainId}
-                      onChange={e => setFromChain(BRIDGE_CHAINS.find(c => c.chainId === Number(e.target.value)) ?? BRIDGE_CHAINS[0])}
-                      className="w-full bg-transparent text-xs font-semibold outline-none cursor-pointer"
-                      style={{ color: 'var(--ink)' }}>
-                      {BRIDGE_CHAINS.filter(c => CHAIN_NAME_MAP[c.chainId]).map(c => (
-                        <option key={c.chainId} value={c.chainId} style={{ background: '#111d30' }}>{c.name}</option>
+                      onChange={e => {
+                        const c = BRIDGE_CHAINS.find(x => x.chainId === Number(e.target.value))
+                        if (c) { setFromChain(c); if (c.chainId === toChain.chainId) setToChain(BRIDGE_CHAINS.find(x => x.chainId !== c.chainId) ?? BRIDGE_CHAINS[1]) }
+                      }}
+                      className="w-full text-xs rounded-lg px-2 py-1 outline-none"
+                      style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)', border: '1px solid var(--border)' }}>
+                      {BRIDGE_CHAINS.filter(c => CHAIN_KIT_NAME[c.chainId]).map(c => (
+                        <option key={c.chainId} value={c.chainId} style={{ background: '#0f1c2e' }}>{c.name}</option>
                       ))}
                     </select>
                   </div>
-                  <button onClick={() => { const t = fromChain; setFromChain(toChain); setToChain(t) }}
-                    className="w-8 h-8 rounded-full flex items-center justify-center glass-strong hover:opacity-80 transition-opacity flex-shrink-0">
-                    <ArrowRight size={13} style={{ color: 'var(--accent)' }} />
+
+                  {/* Swap button */}
+                  <button onClick={swap}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center glass-strong hover:opacity-80 transition-opacity mx-auto">
+                    <ArrowRight size={14} style={{ color: 'var(--accent)' }} />
                   </button>
-                  <div className="flex-1 glass rounded-xl p-3">
-                    <div className="text-xs mb-1.5" style={{ color: 'var(--muted)' }}>To</div>
+
+                  {/* To */}
+                  <div className="glass rounded-xl p-3 space-y-2">
+                    <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>To</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <ChainIcon chainId={toChain.chainId} size={22} />
+                      <span className="text-sm font-bold truncate" style={{ color: 'var(--ink)' }}>{toChain.name}</span>
+                    </div>
                     <select value={toChain.chainId}
-                      onChange={e => setToChain(BRIDGE_CHAINS.find(c => c.chainId === Number(e.target.value)) ?? BRIDGE_CHAINS[1])}
-                      className="w-full bg-transparent text-xs font-semibold outline-none cursor-pointer"
-                      style={{ color: 'var(--ink)' }}>
-                      {BRIDGE_CHAINS.filter(c => c.chainId !== fromChain.chainId && CHAIN_NAME_MAP[c.chainId]).map(c => (
-                        <option key={c.chainId} value={c.chainId} style={{ background: '#111d30' }}>{c.name}</option>
+                      onChange={e => {
+                        const c = BRIDGE_CHAINS.find(x => x.chainId === Number(e.target.value))
+                        if (c) setToChain(c)
+                      }}
+                      className="w-full text-xs rounded-lg px-2 py-1 outline-none"
+                      style={{ background: 'var(--surface-muted)', color: 'var(--ink-2)', border: '1px solid var(--border)' }}>
+                      {BRIDGE_CHAINS.filter(c => c.chainId !== fromChain.chainId && CHAIN_KIT_NAME[c.chainId]).map(c => (
+                        <option key={c.chainId} value={c.chainId} style={{ background: '#0f1c2e' }}>{c.name}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                {/* All supported networks */}
+                <div>
+                  <p className="text-xs mb-2" style={{ color: 'var(--subtle)' }}>Supported networks</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {BRIDGE_CHAINS.map(c => (
+                      <div key={c.chainId} className="flex items-center gap-1.5 glass px-2 py-1 rounded-lg">
+                        <ChainIcon chainId={c.chainId} size={14} />
+                        <span className="text-xs" style={{ color: 'var(--ink-2)' }}>{c.name}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Amount */}
                 <div className="glass rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs" style={{ color: 'var(--muted)' }}>Amount</span>
-                    <button onClick={() => setAmount(formattedBalance !== '—' ? formattedBalance : '')}
-                      className="text-xs" style={{ color: 'var(--accent)' }}>
-                      Balance: {formattedBalance} USDC
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>Amount (USDC)</span>
+                    <button onClick={() => setAmount(fmtBalance !== '—' ? fmtBalance : '')}
+                      className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                      Max: {fmtBalance}
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
                     <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                       placeholder="0.00"
-                      className="flex-1 bg-transparent display text-2xl font-bold outline-none tabular"
+                      className="flex-1 bg-transparent display text-3xl font-bold outline-none tabular"
                       style={{ color: 'var(--ink)' }} />
                     <div className="flex items-center gap-1.5 glass-strong px-3 py-2 rounded-xl">
-                      <TokenUSDC variant="branded" size={18} />
-                      <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>USDC</span>
+                      <TokenUSDC variant="branded" size={20} />
+                      <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>USDC</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Preview */}
-                {amount && (
-                  <div className="glass rounded-xl p-3 space-y-2">
-                    {[
-                      { label: 'Bridge fee (0.1%)', value: `${fee} USDC` },
-                      { label: 'You receive', value: `${received} USDC`, highlight: true },
-                      { label: 'Estimated time', value: '~20 sec (fast mode)' },
-                      { label: 'Protocol', value: 'Circle CCTP v2' },
-                      { label: 'Destination', value: toChain.name },
-                    ].map(({ label, value, highlight }) => (
-                      <div key={label} className="flex justify-between text-xs">
-                        <span style={{ color: 'var(--muted)' }}>{label}</span>
-                        <span style={{ color: highlight ? 'var(--secure)' : 'var(--ink-2)' }}>{value}</span>
-                      </div>
-                    ))}
+                {/* Summary */}
+                {amount && parseFloat(amount) > 0 && (
+                  <div className="flex items-center justify-between glass rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <ChainIcon chainId={fromChain.chainId} size={18} />
+                      <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{amount} USDC</span>
+                    </div>
+                    <ArrowRight size={14} style={{ color: 'var(--muted)' }} />
+                    <div className="flex items-center gap-2">
+                      <ChainIcon chainId={toChain.chainId} size={18} />
+                      <span className="text-sm font-semibold" style={{ color: 'var(--secure)' }}>{received} USDC</span>
+                    </div>
                   </div>
                 )}
               </>
             )}
 
-            {/* CCTP step progress */}
-            {bridgeStatus !== 'idle' && (
+            {/* In-progress / done / failed */}
+            {status !== 'idle' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                    {bridgeStatus === 'failed' ? 'Bridge Failed' : bridgeStatus === 'done' ? 'Bridge Complete!' : 'Bridge in Progress'}
-                  </span>
-                  {isBridging && (
-                    <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
-                      <Activity size={11} />
-                      {elapsed}s
-                    </div>
-                  )}
+                <div className="text-center">
+                  <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+                    {status === 'done' ? '✓ Transfer complete' : status === 'failed' ? 'Transfer failed' : `Transferring${isBridging ? ` · ${elapsed}s` : ''}`}
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+                    {amount} USDC · {fromChain.name} → {toChain.name}
+                  </p>
                 </div>
-                <StepIndicator current={bridgeStatus} />
-                {srcHash && (
-                  <a href={buildTxExplorerUrl(fromChain.chainId, srcHash)} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs" style={{ color: 'var(--accent)' }}>
-                    <ExternalLink size={10} />Source transaction
-                  </a>
-                )}
-                {dstHash && (
-                  <a href={buildTxExplorerUrl(toChain.chainId, dstHash)} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs" style={{ color: 'var(--accent)' }}>
-                    <ExternalLink size={10} />Destination transaction
-                  </a>
+                <StepBar current={status} />
+                {(srcHash || dstHash) && (
+                  <div className="flex flex-col gap-1.5">
+                    {srcHash && (
+                      <a href={buildTxExplorerUrl(fromChain.chainId, srcHash)} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs" style={{ color: 'var(--accent)' }}>
+                        <ExternalLink size={10} />View source transaction
+                      </a>
+                    )}
+                    {dstHash && (
+                      <a href={buildTxExplorerUrl(toChain.chainId, dstHash)} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs" style={{ color: 'var(--secure)' }}>
+                        <ExternalLink size={10} />View destination transaction
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
-            <div className="glass rounded-xl p-3 flex items-start gap-2">
-              <Info size={11} style={{ color: 'var(--muted)', flexShrink: 0, marginTop: 1 }} />
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                PRIVEX uses Circle CCTP — an audited burn-and-mint protocol. Transactions are publicly visible on both chains.
-              </p>
-            </div>
-
-            {bridgeStatus === 'done' ? (
-              <button onClick={resetBridge}
+            {/* Action buttons */}
+            {status === 'done' ? (
+              <button onClick={reset}
                 className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
                 style={{ background: 'var(--surface-strong)', color: 'var(--ink)' }}>
-                <RefreshCw size={14} />New Bridge
+                <RefreshCw size={14} />New Transfer
               </button>
-            ) : bridgeStatus === 'failed' ? (
+            ) : status === 'failed' ? (
               <div className="flex gap-2">
                 <button onClick={() => { void retryBridge() }}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                  className="flex-1 py-3 rounded-xl text-sm font-semibold"
                   style={{ background: 'var(--warning)', color: '#080e1a' }}>
-                  <RefreshCw size={14} />Retry
+                  Retry
                 </button>
-                <button onClick={resetBridge}
+                <button onClick={reset}
                   className="flex-1 py-3 rounded-xl text-sm font-semibold"
                   style={{ background: 'var(--surface-strong)', color: 'var(--ink)' }}>
                   Cancel
@@ -431,24 +410,17 @@ export default function BridgeSection() {
               </div>
             ) : (
               <button onClick={() => { void startBridge() }}
-                disabled={!amount || !address || fromChain.chainId === toChain.chainId || isBridging}
-                className="w-full py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
+                disabled={!amount || parseFloat(amount) <= 0 || fromChain.chainId === toChain.chainId || isBridging}
+                className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
                 style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)', color: '#080e1a' }}>
                 {isBridging
-                  ? <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Bridging...</>
+                  ? <><div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Transferring...</>
                   : !address ? 'Connect Wallet'
-                  : fromChain.chainId === toChain.chainId ? 'Select Different Chains'
+                  : fromChain.chainId === toChain.chainId ? 'Select Different Networks'
                   : !amount ? 'Enter Amount'
-                  : <><Globe size={14} />Bridge {amount} USDC</>}
+                  : <>Send {amount} USDC to {toChain.name}</>}
               </button>
             )}
-          </div>
-
-          <div className="glass rounded-xl p-3 flex items-start gap-2">
-            <AlertTriangle size={11} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 1 }} />
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Mainnet bridge moves real USDC. Double-check chains and amounts. CCTP is audited Circle infrastructure.
-            </p>
           </div>
         </div>
       )}
@@ -456,37 +428,32 @@ export default function BridgeSection() {
       {tab === 'history' && (
         <div className="glass-strong rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Bridge History</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Transfer History</span>
           </div>
           {history.length === 0 ? (
             <div className="text-center py-12">
-              <Globe size={28} style={{ color: 'var(--subtle)' }} className="mx-auto mb-3" />
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>No bridge transactions yet</p>
+              <Clock size={28} style={{ color: 'var(--subtle)' }} className="mx-auto mb-3" />
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>No transfers yet</p>
             </div>
-          ) : (
-            history.map(r => (
-              <div key={r.id} className="px-4 py-3 border-b last:border-0 hover:bg-white/5 transition-colors" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    {r.amount} USDC · {r.fromChain} → {r.toChain}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: r.status === 'done' ? 'var(--secure)' : r.status === 'failed' ? 'var(--danger)' : 'var(--warning)' }} />
-                    <span className="text-xs capitalize" style={{ color: 'var(--subtle)' }}>{r.status}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs" style={{ color: 'var(--subtle)' }}>{new Date(r.timestamp).toLocaleString()}</span>
-                  {r.srcHash && (
-                    <a href={buildTxExplorerUrl(fromChain.chainId, r.srcHash)} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs" style={{ color: 'var(--accent)' }}>
-                      <ExternalLink size={9} />Source tx
-                    </a>
-                  )}
+          ) : history.map(r => (
+            <div key={r.id} className="px-4 py-3 border-b last:border-0 hover:bg-white/5" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2">
+                <ChainIcon chainId={r.fromChainId} size={16} />
+                <ArrowRight size={10} style={{ color: 'var(--subtle)' }} />
+                <ChainIcon chainId={r.toChainId} size={16} />
+                <span className="text-sm font-semibold ml-1" style={{ color: 'var(--ink)' }}>{r.amount} USDC</span>
+                <div className="ml-auto flex items-center gap-1">
+                  {r.status === 'done'
+                    ? <CheckCircle size={12} style={{ color: 'var(--secure)' }} />
+                    : <XCircle size={12} style={{ color: 'var(--danger)' }} />}
+                  <span className="text-xs capitalize" style={{ color: 'var(--subtle)' }}>{r.status}</span>
                 </div>
               </div>
-            ))
-          )}
+              <p className="text-xs mt-1" style={{ color: 'var(--subtle)' }}>
+                {r.fromChain} → {r.toChain} · {new Date(r.timestamp).toLocaleString()}
+              </p>
+            </div>
+          ))}
         </div>
       )}
     </div>
