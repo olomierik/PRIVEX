@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+/* Arc Dark — privacy/infrastructure theme */
+:root {
+  --bg: #080e1a;
+  --bg-gradient: linear-gradient(180deg, #080e1a 0%, #0a1628 58%, #0d1f3c 100%);
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-strong: rgba(255, 255, 255, 0.09);
+  --surface-muted: #111d30;
+  --ink: #eef2fb;
+  --ink-2: #c8d8f0;
+  --muted: #8ba4c8;
+  --subtle: #5a7299;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(168, 200, 255, 0.35);
+  --accent: #6ee7f7;
+  --accent-2: #a78bfa;
+  --accent-hover: #93f0ff;
+  --success: #4ade80;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  /* Privacy green — encrypted / secure state */
+  --secure: #00d97e;
+  --secure-dim: rgba(0, 217, 126, 0.15);
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  margin: 0;
+  min-height: 100dvh;
+}
+
+.display {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', Menlo, monospace;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+/* Encrypted badge shimmer */
+@keyframes secureShimmer {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.secure-pulse { animation: secureShimmer 2.5s ease-in-out infinite; }
+
+/* Glass surface */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid var(--border);
+}
+
+.glass-strong {
+  background: var(--surface-strong);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-strong);
+}
+
+/* Sidebar nav active highlight */
+.nav-active {
+  background: var(--surface-strong);
+  color: var(--accent);
+  border-left: 2px solid var(--accent);
+}
+
+/* ConnectKit overrides */
+.ck-overlay { z-index: 10000 !important; }
+
+/* Sonner toast overrides */
+[data-sonner-toaster] {
+  --normal-bg: #111d30 !important;
+  --normal-border: rgba(255,255,255,0.12) !important;
+  --normal-text: #eef2fb !important;
+}
+
+/* Tabular numbers for all money amounts */
+.tabular { font-variant-numeric: tabular-nums; }
