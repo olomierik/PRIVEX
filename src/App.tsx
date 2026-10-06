@@ -1,6 +1,5 @@
 import { useReducer, useEffect } from 'react'
 import { PrivexContext, privexReducer, initialState, type NavSection } from './lib/store'
-import AuthGate from './components/AuthGate'
 import PrivexLayout from './components/PrivexLayout'
 import HomeSection from './components/sections/HomeSection'
 import MessagingSection from './components/sections/MessagingSection'
@@ -51,7 +50,6 @@ function AppInner() {
 
   return (
     <PrivexContext.Provider value={{ state, dispatch }}>
-      <AuthGate />
       <PrivexLayout>
         <SectionContent section={state.activeSection} />
       </PrivexLayout>

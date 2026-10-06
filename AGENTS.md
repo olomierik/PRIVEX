@@ -16,13 +16,19 @@ PRIVEX is a Web3 privacy protocol on Arc combining wallet-based identity, end-to
 | AccessManager | `contracts/AccessManager.sol` | Wallet identity registry, tier gating by PVX balance |
 | PaymentRouter | `contracts/PaymentRouter.sol` | USDC service payments with fee routing |
 
-## Deployed Addresses (fill after `forge build && deploy`)
+## Deployed Addresses — Arc Testnet
 
-Set these in `.env`:
+| Contract | Address | Explorer |
+|----------|---------|---------|
+| PRIVEXToken (PVX) | `0xdaf854107d4fbffadc841f7dab33f16a81181653` | [explorer](https://explorer.testnet.arc.io/address/0xdaf854107d4fbffadc841f7dab33f16a81181653) |
+| AccessManager | `0x515cb956a4404d6eedd84c253a36778d1d9b5e1e` | [explorer](https://explorer.testnet.arc.io/address/0x515cb956a4404d6eedd84c253a36778d1d9b5e1e) |
+| PaymentRouter | `0x598e9154f451046769c529c3517993e9ebe25800` | [explorer](https://explorer.testnet.arc.io/address/0x598e9154f451046769c529c3517993e9ebe25800) |
+
+Set in `.env`:
 ```
-VITE_PRIVEX_TOKEN_ADDRESS=
-VITE_ACCESS_MANAGER_ADDRESS=
-VITE_PAYMENT_ROUTER_ADDRESS=
+VITE_PRIVEX_TOKEN_ADDRESS=0xdaf854107d4fbffadc841f7dab33f16a81181653
+VITE_ACCESS_MANAGER_ADDRESS=0x515cb956a4404d6eedd84c253a36778d1d9b5e1e
+VITE_PAYMENT_ROUTER_ADDRESS=0x598e9154f451046769c529c3517993e9ebe25800
 ```
 
 ## Architecture

@@ -3,36 +3,47 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Home, MessageSquare, Phone, Mail, CreditCard, ArrowLeftRight,
   Globe, Wifi, Users, ShieldCheck, Lock, Settings, Menu, X,
-  Shield, ChevronRight, LayoutDashboard, type LucideProps
+  ChevronRight, LayoutDashboard
 } from 'lucide-react'
-import { type ForwardRefExoticComponent, type RefAttributes } from 'react'
 import { usePrivex, type NavSection } from '../lib/store'
 import { useAccount } from 'wagmi'
 import { ConnectKitButton } from 'connectkit'
 
-type LucideIcon = ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
 
-interface NavItem {
-  id: NavSection
-  label: string
-  icon: LucideIcon
-  badge?: string
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
-  { id: 'calls', label: 'Calls', icon: Phone },
-  { id: 'email', label: 'Email', icon: Mail },
-  { id: 'payments', label: 'Payments', icon: CreditCard },
-  { id: 'swap', label: 'Swap', icon: ArrowLeftRight },
-  { id: 'bridge', label: 'Bridge', icon: Globe },
-  { id: 'vpn', label: 'VPN', icon: Wifi },
-  { id: 'contacts', label: 'Contacts', icon: Users },
-  { id: 'identity', label: 'Identity', icon: ShieldCheck },
-  { id: 'security', label: 'Security', icon: Lock },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'admin', label: 'Admin', icon: LayoutDashboard },
+const NAV_GROUPS = [
+  {
+    label: 'Communication',
+    items: [
+      { id: 'home' as NavSection,     label: 'Home',     icon: Home },
+      { id: 'messages' as NavSection, label: 'Messages', icon: MessageSquare },
+      { id: 'calls' as NavSection,    label: 'Calls',    icon: Phone },
+      { id: 'email' as NavSection,    label: 'Email',    icon: Mail },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { id: 'payments' as NavSection, label: 'Payments', icon: CreditCard },
+      { id: 'swap' as NavSection,     label: 'Swap',     icon: ArrowLeftRight },
+      { id: 'bridge' as NavSection,   label: 'Bridge',   icon: Globe },
+    ],
+  },
+  {
+    label: 'Privacy',
+    items: [
+      { id: 'vpn' as NavSection,      label: 'VPN',      icon: Wifi },
+      { id: 'contacts' as NavSection, label: 'Contacts', icon: Users },
+      { id: 'identity' as NavSection, label: 'Identity', icon: ShieldCheck },
+      { id: 'security' as NavSection, label: 'Security', icon: Lock },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { id: 'settings' as NavSection, label: 'Settings', icon: Settings },
+      { id: 'admin' as NavSection,    label: 'Admin',    icon: LayoutDashboard },
+    ],
+  },
 ]
 
 export default function PrivexLayout({ children }: { children: ReactNode }) {
@@ -45,7 +56,15 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh" style={{ background: 'var(--bg-gradient)' }}>
+    <div className="flex min-h-dvh relative" style={{ background: 'var(--bg-gradient)' }}>
+      {/* Ambient orbs */}
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
+
+      {/* Grid overlay */}
+      <div className="grid-overlay" />
+
       {/* Mobile overlay */}
       <AnimatePresence>
         {state.sidebarOpen && (
@@ -54,7 +73,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-20 md:hidden"
+            className="fixed inset-0 bg-black/70 z-20 md:hidden backdrop-blur-sm"
             onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
           />
         )}
@@ -62,89 +81,117 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
 
       {/* Sidebar */}
       <AnimatePresence initial={false}>
-        {(state.sidebarOpen || window.innerWidth >= 768) && (
+        {(state.sidebarOpen || typeof window !== 'undefined' && window.innerWidth >= 768) && (
           <motion.aside
             key="sidebar"
             initial={{ x: -280 }}
             animate={{ x: 0 }}
             exit={{ x: -280 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed md:sticky top-0 left-0 h-dvh w-64 z-30 flex flex-col glass border-r"
-            style={{ borderColor: 'var(--border)' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="fixed md:sticky top-0 left-0 h-dvh w-64 z-30 flex flex-col"
+            style={{
+              background: 'rgba(3, 8, 15, 0.92)',
+              borderRight: '1px solid var(--border)',
+              backdropFilter: 'blur(24px) saturate(180%)',
+            }}
           >
+            {/* Sidebar top glow strip */}
+            <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)' }} />
+
             {/* Logo */}
-            <div className="px-5 py-5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)' }}>
-                  <Shield size={16} className="text-[#080e1a]" />
-                </div>
+            <div className="px-5 py-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+              <div className="flex items-center gap-3">
+                <img
+                  src="/privex-logo.svg"
+                  alt="PRIVEX"
+                  className="w-10 h-10 rounded-xl flex-shrink-0"
+                  style={{ filter: 'drop-shadow(0 0 8px rgba(59,130,246,0.55))' }}
+                />
                 <div>
-                  <div className="display font-bold text-sm tracking-wider" style={{ color: 'var(--ink)', letterSpacing: '0.12em' }}>PRIVEX</div>
-                  <div className="text-xs" style={{ color: 'var(--subtle)', letterSpacing: '0.04em' }}>Private Digital Life</div>
+                  <div className="display font-bold text-base tracking-[0.14em]" style={{ color: 'var(--ink)', letterSpacing: '0.14em' }}>PRIVEX</div>
+                  <div className="text-[10px] font-medium tracking-wider" style={{ color: 'var(--subtle)', letterSpacing: '0.06em' }}>Private Digital Life</div>
                 </div>
               </div>
               <button
                 onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-                className="md:hidden p-1 rounded"
+                className="md:hidden p-1.5 rounded-lg transition-colors hover:bg-white/10"
                 style={{ color: 'var(--muted)' }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
-            {/* User identity */}
-            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            {/* User identity row */}
+            <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
               {address ? (
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'var(--surface-strong)', color: 'var(--accent)' }}>
-                    {state.privexHandle ? state.privexHandle[0].toUpperCase() : address.slice(2, 4).toUpperCase()}
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2.5 cursor-pointer group"
+                  onClick={() => setSection('identity')}
+                >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #818cf8 100%)', color: '#fff' }}>
+                    {address.slice(2, 4).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {state.privexHandle ? (
-                      <div className="text-xs font-semibold truncate" style={{ color: 'var(--ink)' }}>{state.privexHandle}@privex</div>
-                    ) : (
-                      <div className="text-xs font-semibold truncate mono" style={{ color: 'var(--ink)' }}>{address.slice(0, 6)}...{address.slice(-4)}</div>
-                    )}
+                    <div className="text-xs font-semibold mono truncate" style={{ color: 'var(--ink)' }}>
+                      {address.slice(0, 6)}...{address.slice(-4)}
+                    </div>
                     <div className="flex items-center gap-1 mt-0.5">
                       <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: 'var(--secure)' }} />
-                      <span className="text-xs" style={{ color: 'var(--secure)' }}>Authenticated</span>
+                      <span className="text-[10px]" style={{ color: 'var(--secure)' }}>Connected</span>
                     </div>
                   </div>
-                  <ChevronRight size={12} style={{ color: 'var(--subtle)' }} />
-                </div>
+                  <ChevronRight size={11} style={{ color: 'var(--subtle)' }} className="group-hover:translate-x-0.5 transition-transform" />
+                </motion.div>
               ) : (
-                <div className="text-xs" style={{ color: 'var(--muted)' }}>Not connected</div>
+                <div className="text-xs" style={{ color: 'var(--subtle)' }}>Wallet not connected</div>
               )}
             </div>
 
-            {/* Nav */}
-            <nav className="flex-1 overflow-y-auto py-2">
-              {NAV_ITEMS.map(item => {
-                const Icon = item.icon
-                const active = state.activeSection === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setSection(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors relative ${active ? 'nav-active' : 'hover:bg-white/5'}`}
-                    style={{ color: active ? 'var(--accent)' : 'var(--muted)' }}
-                  >
-                    <Icon size={16} />
-                    <span className="font-medium">{item.label}</span>
-                    {item.badge && (
-                      <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'var(--danger)', color: 'white' }}>{item.badge}</span>
-                    )}
-                  </button>
-                )
-              })}
+            {/* Nav groups */}
+            <nav className="flex-1 overflow-y-auto py-3 space-y-4 px-2">
+              {NAV_GROUPS.map(group => (
+                <div key={group.label}>
+                  <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.10em]" style={{ color: 'var(--subtle)' }}>
+                    {group.label}
+                  </div>
+                  {group.items.map(item => {
+                    const Icon = item.icon
+                    const active = state.activeSection === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setSection(item.id)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg mb-0.5 transition-all relative ${active ? 'nav-active' : 'hover:bg-white/5'}`}
+                        style={{ color: active ? 'var(--accent)' : 'var(--muted)' }}
+                      >
+                        {active && (
+                          <motion.div
+                            layoutId="nav-indicator"
+                            className="absolute inset-0 rounded-lg"
+                            style={{ background: 'rgba(96,165,250,0.08)' }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                          />
+                        )}
+                        <Icon size={15} className="relative z-10 flex-shrink-0" />
+                        <span className="font-medium relative z-10">{item.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </nav>
 
             {/* Status bar */}
-            <div className="px-4 py-3 border-t space-y-2" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-center justify-between">
+            <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${state.backendOnline ? 'secure-pulse' : ''}`} style={{ background: state.backendOnline ? 'var(--secure)' : 'var(--danger)' }} />
-                  <span className="text-xs" style={{ color: 'var(--subtle)' }}>Relay {state.backendOnline ? 'Online' : 'Offline'}</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${state.backendOnline ? 'secure-pulse' : ''}`}
+                    style={{ background: state.backendOnline ? 'var(--secure)' : 'var(--danger)' }} />
+                  <span className="text-xs" style={{ color: 'var(--subtle)' }}>
+                    Relay {state.backendOnline ? 'Online' : 'Offline'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Wifi size={10} style={{ color: state.vpnConnected ? 'var(--secure)' : 'var(--subtle)' }} />
@@ -153,54 +200,94 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                   </span>
                 </div>
               </div>
+              <div className="text-[10px] text-center" style={{ color: 'var(--subtle)' }}>
+                Arc Testnet · End-to-End Encrypted
+              </div>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Topbar */}
-        <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b glass"
-          style={{ borderColor: 'var(--border)' }}>
+        <header className="sticky top-0 z-20 flex items-center justify-between px-4 md:px-6 py-3"
+          style={{
+            background: 'rgba(3, 8, 15, 0.82)',
+            borderBottom: '1px solid var(--border)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+          }}>
+          {/* Left — menu + section title */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+              className="p-2 rounded-lg transition-all hover:bg-white/8"
               style={{ color: 'var(--muted)' }}
             >
-              <Menu size={18} />
+              <Menu size={17} />
             </button>
-            <h1 className="display font-semibold text-sm capitalize tracking-wide" style={{ color: 'var(--ink)' }}>
+
+            {/* Brand mark visible on mobile */}
+            <div className="flex items-center gap-2 md:hidden">
+              <img
+                src="/privex-logo.svg"
+                alt="PRIVEX"
+                className="w-7 h-7"
+                style={{ filter: 'drop-shadow(0 0 6px rgba(59,130,246,0.6))' }}
+              />
+              <span className="display font-bold text-sm tracking-widest" style={{ color: 'var(--ink)' }}>PRIVEX</span>
+            </div>
+
+            <h1 className="hidden md:block display font-semibold text-sm capitalize tracking-wide" style={{ color: 'var(--ink-2)' }}>
               {state.activeSection}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Right — network pill + connect wallet */}
+          <div className="flex items-center gap-2.5">
+            {/* Network pill */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+              style={{ background: 'var(--surface-mid)', border: '1px solid var(--border)' }}>
+              <div className="w-1.5 h-1.5 rounded-full secure-pulse" style={{ background: 'var(--secure)' }} />
+              <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>Arc Testnet</span>
+            </div>
+
+            {/* Connect Wallet button */}
             <ConnectKitButton.Custom>
               {({ isConnected, show, address: addr }) => (
-                <button
+                <motion.button
                   onClick={show}
-                  className="glass-strong px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all hover:border-[var(--accent)]"
-                  style={{ color: isConnected ? 'var(--ink-2)' : 'var(--accent)' }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
+                  style={isConnected ? {
+                    background: 'var(--surface-mid)',
+                    border: '1px solid var(--border-strong)',
+                    color: 'var(--ink-2)',
+                  } : {
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                    border: '1px solid transparent',
+                    color: '#fff',
+                    boxShadow: '0 0 16px rgba(59,130,246,0.35)',
+                  }}
                 >
-                  <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'secure-pulse' : ''}`}
-                    style={{ background: isConnected ? 'var(--secure)' : 'var(--subtle)' }} />
-                  {isConnected ? `${addr?.slice(0, 6)}...${addr?.slice(-4)}` : 'Connect Wallet'}
-                </button>
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'secure-pulse' : ''}`}
+                    style={{ background: isConnected ? 'var(--secure)' : 'rgba(255,255,255,0.6)' }} />
+                  <span>{isConnected ? `${addr?.slice(0, 6)}...${addr?.slice(-4)}` : 'Connect Wallet'}</span>
+                </motion.button>
               )}
             </ConnectKitButton.Custom>
           </div>
         </header>
 
-        {/* Content */}
+        {/* Page content */}
         <main className="flex-1 overflow-auto">
           <AnimatePresence mode="wait">
             <motion.div
               key={state.activeSection}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1.0] }}
               className="h-full"
             >
               {children}
