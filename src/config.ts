@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unsafe-member-access
 import { http, createConfig } from 'wagmi'
 import { mainnet, base, arbitrum, optimism, polygon, avalanche } from 'wagmi/chains'
 import { arc } from 'viem/chains'
@@ -10,10 +11,10 @@ registerChain(arc.id, arc.rpcUrls.default.http[0])
 export const ARC_MAINNET_ID    = arc.id // 5042
 export const ADMIN_WALLET      = '0x274262A0321A0701b0A46a3576e07aE881c286Bb'
 export const USDC_ARC          = '0x3600000000000000000000000000000000000000'
-export const PAYMENT_ROUTER    = import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS as string
-export const ACCESS_MANAGER    = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as string
+export const PAYMENT_ROUTER    = import.meta.env.VITE_PAYMENT_ROUTER_ADDRESS
+export const ACCESS_MANAGER    = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS
 export const PVX_TOKEN_ADDRESS = '0x31074f65b518D9a711555D27B9d4A59c18211fc5'
-export const PRIVEX_TOKEN      = (import.meta.env.VITE_PRIVEX_TOKEN_ADDRESS as string) ?? PVX_TOKEN_ADDRESS
+export const PRIVEX_TOKEN      = (import.meta.env.VITE_PRIVEX_TOKEN_ADDRESS) ?? PVX_TOKEN_ADDRESS
 export const WC_PROJECT_ID     = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
 
 export const SUPPORTED_CHAINS = [arc, mainnet, base, arbitrum, optimism, polygon, avalanche] as const

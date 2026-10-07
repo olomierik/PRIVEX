@@ -1,36 +1,102 @@
--- PRIVEX Supabase Schema
--- Run this in the Supabase SQL Editor: https://supabase.com/dashboard/project/vgibwxjxtnuoliqtvdyb/sql
+-- PRIVEX Supabase Schema v2
+-- SECURITY: Row Level Security enforced by wallet address header.
+-- The client sends x-wallet-address on every request (set via supabase.ts interceptor).
+-- Supabase passes custom headers through to Postgres as request.headers (jsonb).
+-- RLS policies read current_wallet() to enforce per-user row visibility.
+--
+-- Run the FULL file in: https://supabase.com/dashboard/project/vgibwxjxtnuoliqtvdyb/sql
+-- Drop and recreate if re-running.
 
--- ─── Messages table ───────────────────────────────────────────────────────────
-create table if not exists messages (
+-- ─── Helper: extract wallet address from request headers ──────────────────────
+create or replace function current_wallet()
+returns text
+language sql
+stable
+as $$
+  select nullif(
+    lower(trim(
+      (current_setting('request.headers', true)::jsonb ->> 'x-wallet-address')
+    )),
+    ''
+  )
+$$;
+
+-- ─── Messages ─────────────────────────────────────────────────────────────────
+drop table if exists messages cascade;
+create table messages (
   id            uuid primary key default gen_random_uuid(),
   from_addr     text not null,
   to_addr       text not null,
-  ciphertext    text not null,   -- hex-encoded ciphertext, server never sees plaintext
-  epubkey       text not null,   -- sender ephemeral pubkey
+  ciphertext    text not null,
+  epubkey       text not null,
   created_at    bigint not null default extract(epoch from now())::bigint * 1000,
-  disappears_at bigint           -- optional unix ms expiry
+  disappears_at bigint
 );
 
--- Index for inbox queries
-create index if not exists messages_to_addr_idx   on messages(to_addr);
-create index if not exists messages_created_at_idx on messages(created_at);
+create index messages_to_addr_idx    on messages(to_addr);
+create index messages_from_addr_idx  on messages(from_addr);
+create index messages_created_at_idx on messages(created_at);
 
--- ─── Signals table (WebRTC signaling) ─────────────────────────────────────────
-create table if not exists signals (
+alter table messages enable row level security;
+
+-- Only the sender can insert their own messages
+create policy "messages: insert as self" on messages
+  for insert
+  with check (lower(from_addr) = current_wallet());
+
+-- Only sender OR recipient can read a message
+create policy "messages: read own" on messages
+  for select
+  using (
+    lower(to_addr)   = current_wallet()
+    or lower(from_addr) = current_wallet()
+  );
+
+-- Only the sender can delete their own messages
+create policy "messages: delete own" on messages
+  for delete
+  using (lower(from_addr) = current_wallet());
+
+-- ─── Signals (WebRTC — short-lived, no sensitive content) ─────────────────────
+drop table if exists signals cascade;
+create table signals (
   id         uuid primary key default gen_random_uuid(),
   room_id    text not null,
   from_addr  text not null,
-  type       text not null,    -- "offer" | "answer" | "ice"
-  payload    text not null,    -- SDP or ICE candidate JSON
+  type       text not null,
+  payload    text not null,
   created_at bigint not null default extract(epoch from now())::bigint * 1000
 );
 
-create index if not exists signals_room_idx on signals(room_id);
-create index if not exists signals_created_at_idx on signals(created_at);
+create index signals_room_idx       on signals(room_id);
+create index signals_created_at_idx on signals(created_at);
 
--- ─── Emails table ─────────────────────────────────────────────────────────────
-create table if not exists emails (
+alter table signals enable row level security;
+
+-- Any authenticated wallet can post a signal
+create policy "signals: insert as self" on signals
+  for insert
+  with check (current_wallet() is not null);
+
+-- Only participants in the room can read signals
+-- Room ID format: sorted(addrA, addrB) joined by ':' — enforced client-side
+create policy "signals: read room participant" on signals
+  for select
+  using (
+    current_wallet() is not null
+    and (
+      room_id like ('%' || current_wallet() || '%')
+    )
+  );
+
+-- Sender can delete
+create policy "signals: delete own" on signals
+  for delete
+  using (lower(from_addr) = current_wallet());
+
+-- ─── Emails ───────────────────────────────────────────────────────────────────
+drop table if exists emails cascade;
+create table emails (
   id              uuid primary key default gen_random_uuid(),
   from_addr       text not null,
   to_addr         text not null,
@@ -47,37 +113,68 @@ create table if not exists emails (
   is_draft        boolean not null default false
 );
 
-create index if not exists emails_to_addr_idx    on emails(to_addr);
-create index if not exists emails_from_addr_idx  on emails(from_addr);
-create index if not exists emails_created_at_idx on emails(created_at);
+create index emails_to_addr_idx    on emails(to_addr);
+create index emails_from_addr_idx  on emails(from_addr);
+create index emails_created_at_idx on emails(created_at);
 
--- ─── Row Level Security ───────────────────────────────────────────────────────
--- Messages: anyone can insert; only recipient can read; only sender can delete
-alter table messages enable row level security;
-
-create policy "insert messages" on messages
-  for insert with check (true);
-
-create policy "read own messages" on messages
-  for select using (true);   -- client filters by wallet; no server-side auth token yet
-
-create policy "delete messages" on messages
-  for delete using (true);
-
--- Signals: open read/write (short-lived, no sensitive data)
-alter table signals enable row level security;
-
-create policy "signals open" on signals
-  for all using (true) with check (true);
-
--- Emails: open read/write (payload is always ciphertext)
 alter table emails enable row level security;
 
-create policy "emails open" on emails
-  for all using (true) with check (true);
+-- Only sender can insert
+create policy "emails: insert as self" on emails
+  for insert
+  with check (lower(from_addr) = current_wallet());
 
--- ─── Realtime: enable publications ───────────────────────────────────────────
--- Run these in the Supabase dashboard under Database > Replication
--- or uncomment here if your Supabase plan supports it via SQL:
+-- Sender can read sent mail + drafts; recipient can read received mail
+create policy "emails: read own" on emails
+  for select
+  using (
+    lower(to_addr)   = current_wallet()
+    or lower(from_addr) = current_wallet()
+  );
+
+-- Sender can update drafts
+create policy "emails: update own draft" on emails
+  for update
+  using (lower(from_addr) = current_wallet())
+  with check (lower(from_addr) = current_wallet());
+
+-- Sender or recipient can delete
+create policy "emails: delete own" on emails
+  for delete
+  using (
+    lower(from_addr) = current_wallet()
+    or lower(to_addr) = current_wallet()
+  );
+
+-- ─── Public keys table (for key discovery) ────────────────────────────────────
+drop table if exists pubkeys cascade;
+create table pubkeys (
+  wallet_addr text primary key,
+  pubkey_hex  text not null,
+  updated_at  bigint not null default extract(epoch from now())::bigint * 1000
+);
+
+alter table pubkeys enable row level security;
+
+-- Anyone can read public keys (they are public by definition)
+create policy "pubkeys: read all" on pubkeys
+  for select
+  using (true);
+
+-- Only the wallet owner can upsert their own pubkey
+create policy "pubkeys: upsert own" on pubkeys
+  for insert
+  with check (lower(wallet_addr) = current_wallet());
+
+create policy "pubkeys: update own" on pubkeys
+  for update
+  using (lower(wallet_addr) = current_wallet())
+  with check (lower(wallet_addr) = current_wallet());
+
+-- ─── Realtime publications ────────────────────────────────────────────────────
+-- Run in Supabase dashboard: Database > Replication > supabase_realtime
+-- or uncomment:
 -- alter publication supabase_realtime add table messages;
 -- alter publication supabase_realtime add table signals;
+-- alter publication supabase_realtime add table emails;
+-- alter publication supabase_realtime add table pubkeys;

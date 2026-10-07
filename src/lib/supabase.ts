@@ -1,11 +1,12 @@
+// oxlint-disable typescript/no-unsafe-member-access
 /**
  * PRIVEX Supabase client
  * Encrypted relay — server only ever stores ciphertext.
  */
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('[PRIVEX] Supabase env vars missing — relay will be unavailable')

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Home, MessageSquare, Phone, Mail, CreditCard, ArrowLeftRight,
@@ -59,6 +59,29 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
   const { disconnect } = useDisconnect()
   const [walletMenuOpen, setWalletMenuOpen] = useState(false)
   const [wcConnecting, setWcConnecting] = useState(false)
+  // Track whether we're on desktop (md+) — initialized directly from matchMedia
+  const desktopMq = typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)') : null
+  const [isDesktop, setIsDesktop] = useState(() => desktopMq?.matches ?? true)
+  const walletBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!desktopMq) return
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    desktopMq.addEventListener('change', handler)
+    return () => desktopMq.removeEventListener('change', handler)
+  }, [desktopMq])
+
+  // Close wallet menu on outside click
+  useEffect(() => {
+    if (!walletMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (walletBtnRef.current && !walletBtnRef.current.closest('.wallet-picker-root')?.contains(e.target as Node)) {
+        setWalletMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [walletMenuOpen])
 
   const connectWalletConnect = () => {
     if (!WC_PROJECT_ID) return
@@ -72,7 +95,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
     )
   }
 
-  // Always dark mode — purge any stale light setting
+  // Always dark mode
   useEffect(() => {
     document.documentElement.removeAttribute('data-theme')
     localStorage.removeItem('privex-theme')
@@ -80,12 +103,17 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
 
   const setSection = (section: NavSection) => {
     dispatch({ type: 'SET_SECTION', section })
-    if (window.innerWidth < 768) dispatch({ type: 'TOGGLE_SIDEBAR' })
+    // Only close sidebar on mobile
+    if (!isDesktop) dispatch({ type: 'TOGGLE_SIDEBAR' })
   }
 
+  // Whether the sidebar drawer should be visible
+  const showSidebar = isDesktop || state.sidebarOpen
+
   return (
-    <div className="flex min-h-dvh relative" style={{ background: 'var(--bg-gradient)' }}>
-      {/* Ambient orbs */}
+    // h-dvh + overflow-hidden prevents the page-level bounce/shake
+    <div className="flex h-dvh overflow-hidden relative" style={{ background: 'var(--bg-gradient)' }}>
+      {/* Ambient orbs — contained inside the viewport */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
       <div className="orb orb-3" />
@@ -93,14 +121,15 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile backdrop */}
       <AnimatePresence>
-        {state.sidebarOpen && (
+        {state.sidebarOpen && !isDesktop && (
           <motion.div
             key="overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-20 md:hidden"
-            style={{ backdropFilter: 'blur(4px)' }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 z-20"
+            style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
             onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
           />
         )}
@@ -108,17 +137,20 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
 
       {/* ── Sidebar ── */}
       <AnimatePresence initial={false}>
-        {(state.sidebarOpen || (typeof window !== 'undefined' && window.innerWidth >= 768)) && (
+        {showSidebar && (
           <motion.aside
             key="sidebar"
-            initial={{ x: -264 }}
+            initial={isDesktop ? false : { x: -264 }}
             animate={{ x: 0 }}
-            exit={{ x: -264 }}
-            transition={{ type: 'spring', stiffness: 360, damping: 36 }}
-            className="fixed md:sticky top-0 left-0 h-dvh z-30 flex flex-col"
+            exit={isDesktop ? {} : { x: -264 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 38 }}
+            className="flex-shrink-0 h-dvh z-30 flex flex-col"
             style={{
-              width: 264,
-              background: 'rgba(8,14,28,0.97)',
+              width: 260,
+              // Mobile: fixed overlay. Desktop: part of flex row (no fixed)
+              position: isDesktop ? 'relative' : 'fixed',
+              top: 0, left: 0,
+              background: 'rgba(8,14,28,0.98)',
               borderRight: '1px solid var(--border)',
               backdropFilter: 'blur(32px) saturate(180%)',
               WebkitBackdropFilter: 'blur(32px) saturate(180%)',
@@ -126,70 +158,69 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
           >
             {/* Top accent line */}
             <div className="absolute top-0 left-0 right-0 h-[1px]"
-              style={{ background: 'linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%)', opacity: 0.5 }} />
+              style={{ background: 'linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%)', opacity: 0.4 }} />
 
             {/* Logo */}
-            <div className="px-5 h-[58px] flex items-center justify-between flex-shrink-0"
-              style={{ borderBottom: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-3">
-                {/* Logo mark — white on dark, always visible */}
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            <div className="px-5 flex items-center justify-between flex-shrink-0"
+              style={{ height: 58, borderBottom: '1px solid var(--border)' }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.18) 0%, rgba(79,70,229,0.22) 100%)', border: '1px solid rgba(140,180,255,0.25)' }}>
-                  <img src="/privex-icon.svg" alt="PRIVEX" className="w-6 h-6" />
+                  <img src="/privex-icon.svg" alt="PRIVEX" className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="font-bold tracking-[0.18em] text-[14px]"
+                <div className="min-w-0">
+                  <div className="font-bold tracking-[0.18em] text-[13px] truncate"
                     style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#f0f6ff' }}>
                     PRIVEX
                   </div>
-                  <div className="text-[10px] tracking-[0.12em] uppercase" style={{ color: 'var(--subtle)' }}>
+                  <div className="text-[10px] tracking-[0.10em] uppercase truncate" style={{ color: 'var(--subtle)' }}>
                     Encrypted · Private
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-                className="md:hidden p-1.5 rounded-lg"
+                className="flex-shrink-0 p-2 rounded-lg transition-colors hover:bg-white/8"
                 style={{ color: 'var(--subtle)' }}
+                aria-label="Close sidebar"
               >
                 <X size={14} />
               </button>
             </div>
 
-            {/* Wallet identity */}
+            {/* Wallet identity chip */}
             {address ? (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              <button
                 onClick={() => setSection('identity')}
-                className="mx-3 mt-3 flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-white/5"
-                style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+                className="mx-3 mt-3 flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-white/5 text-left"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', flexShrink: 0 }}
               >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #4f46e5 100%)', color: '#fff' }}>
                   {address.slice(2, 4).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="text-[12px] font-semibold mono truncate" style={{ color: 'var(--ink)' }}>
-                    {address.slice(0, 8)}…{address.slice(-5)}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-semibold mono truncate" style={{ color: 'var(--ink)' }}>
+                    {address.slice(0, 7)}…{address.slice(-5)}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="w-1.5 h-1.5 rounded-full secure-pulse flex-shrink-0" style={{ background: 'var(--secure)' }} />
-                    <span className="text-[11px]" style={{ color: 'var(--secure)' }}>Connected</span>
+                    <span className="text-[10px]" style={{ color: 'var(--secure)' }}>Connected</span>
                   </div>
                 </div>
-              </motion.button>
+              </button>
             ) : (
-              <div className="mx-3 mt-3 px-3 py-2.5 rounded-xl text-[12px]"
-                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--subtle)' }}>
+              <div className="mx-3 mt-3 px-3 py-2 rounded-xl text-[11px]" style={{ flexShrink: 0,
+                background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--subtle)' }}>
                 No wallet connected
               </div>
             )}
 
-            {/* Nav */}
-            <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+            {/* Nav — scrollable */}
+            <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-4 overscroll-contain">
               {NAV_GROUPS.map(group => (
                 <div key={group.label}>
-                  <p className="label-caps px-3 mb-1.5">{group.label}</p>
+                  <p className="label-caps px-3 mb-1">{group.label}</p>
                   <div className="space-y-0.5">
                     {group.items.map(item => {
                       const Icon = item.icon
@@ -198,17 +229,17 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                         <button
                           key={item.id}
                           onClick={() => setSection(item.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all relative text-[13px] font-medium ${active ? 'nav-active' : ''}`}
+                          className={`w-full flex items-center gap-3 px-3 rounded-xl transition-all relative text-[13px] font-medium ${active ? 'nav-active' : 'hover:bg-white/5'}`}
                           style={{
                             color: active ? 'var(--accent)' : 'var(--muted)',
-                            minHeight: 42,
+                            height: 40,
                           }}
                         >
                           {active && (
                             <motion.div
                               layoutId="nav-pill"
                               className="absolute inset-0 rounded-xl"
-                              style={{ background: 'rgba(172,198,233,0.09)', border: '1px solid rgba(172,198,233,0.14)' }}
+                              style={{ background: 'rgba(96,165,250,0.09)', border: '1px solid rgba(96,165,250,0.14)' }}
                               transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                             />
                           )}
@@ -222,19 +253,19 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            {/* Footer — status only, no branding */}
+            {/* Footer status */}
             <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${state.backendOnline ? 'secure-pulse' : ''}`}
                     style={{ background: state.backendOnline ? 'var(--secure)' : 'var(--danger)' }} />
-                  <span className="text-[11px]" style={{ color: 'var(--subtle)' }}>
-                    {state.backendOnline ? 'Secure relay online' : 'Offline'}
+                  <span className="text-[10px] truncate" style={{ color: 'var(--subtle)' }}>
+                    {state.backendOnline ? 'Relay online' : 'Offline'}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <Wifi size={10} style={{ color: state.vpnConnected ? 'var(--secure)' : 'var(--subtle)' }} />
-                  <span className="text-[11px]" style={{ color: state.vpnConnected ? 'var(--secure)' : 'var(--subtle)' }}>
+                  <span className="text-[10px]" style={{ color: state.vpnConnected ? 'var(--secure)' : 'var(--subtle)' }}>
                     {state.vpnConnected ? state.vpnLocation : 'VPN Off'}
                   </span>
                 </div>
@@ -244,91 +275,103 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
         )}
       </AnimatePresence>
 
-      {/* ── Main ── */}
-      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+      {/* ── Main column ── */}
+      <div className="flex-1 flex flex-col min-w-0 relative z-10 overflow-hidden">
         {/* Topbar */}
         <header
-          className="sticky top-0 z-20 flex items-center justify-between px-4 md:px-5"
+          className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4"
           style={{
-            background: 'rgba(8,14,28,0.90)',
+            height: 58,
+            background: 'rgba(8,14,28,0.92)',
             borderBottom: '1px solid var(--border)',
             backdropFilter: 'blur(24px) saturate(170%)',
             WebkitBackdropFilter: 'blur(24px) saturate(170%)',
-            height: 58,
+            position: 'relative',
+            zIndex: 20,
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Hamburger */}
             <button
               onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-              className="p-2 rounded-xl transition-all"
+              className="flex-shrink-0 flex items-center justify-center rounded-xl transition-all"
               style={{
                 color: 'var(--muted)',
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
-                minHeight: 38, minWidth: 38,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 38, height: 38,
               }}
+              aria-label="Open menu"
             >
               <Menu size={15} />
             </button>
 
-            {/* Mobile logo */}
-            <div className="flex items-center gap-2 md:hidden">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+            {/* Mobile logo mark */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.18) 0%, rgba(79,70,229,0.22) 100%)', border: '1px solid rgba(140,180,255,0.2)' }}>
-                <img src="/privex-icon.svg" alt="PRIVEX" className="w-5 h-5" />
+                <img src="/privex-icon.svg" alt="PRIVEX" className="w-4.5 h-4.5" />
               </div>
-              <span className="font-bold tracking-[0.18em] text-[13px]"
+              <span className="font-bold tracking-[0.16em] text-[12px] sm:text-[13px] md:hidden"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#f0f6ff' }}>
                 PRIVEX
               </span>
+              <h1 className="hidden md:block font-semibold text-[15px]"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--ink-2)', letterSpacing: '-0.01em' }}>
+                {SECTION_TITLES[state.activeSection] ?? state.activeSection}
+              </h1>
             </div>
-
-            {/* Desktop section title */}
-            <h1 className="hidden md:block font-semibold text-[15px]"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--ink-2)', letterSpacing: '-0.01em' }}>
-              {SECTION_TITLES[state.activeSection] ?? state.activeSection}
-            </h1>
           </div>
 
-          {/* Wallet button */}
-          <div className="relative">
+          {/* Wallet button — right side */}
+          <div className="relative wallet-picker-root flex-shrink-0">
             <motion.button
+              ref={walletBtnRef}
               onClick={() => isConnected ? void disconnect() : setWalletMenuOpen(v => !v)}
               whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-[13px] transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 rounded-xl font-semibold transition-all"
               style={isConnected ? {
                 background: 'var(--surface-mid)',
                 border: '1px solid var(--border-strong)',
                 color: 'var(--ink-2)',
-                minHeight: 38,
+                height: 38,
+                paddingLeft: 12, paddingRight: 12,
+                fontSize: 12,
               } : {
                 background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
                 border: '1px solid rgba(140,180,255,0.3)',
                 color: '#ffffff',
-                minHeight: 38,
+                height: 38,
+                paddingLeft: 12, paddingRight: 12,
+                fontSize: 12,
               }}
             >
               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'secure-pulse' : ''}`}
                 style={{ background: isConnected ? 'var(--secure)' : 'rgba(255,255,255,0.6)' }} />
-              <span>{isConnected && address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'Connect Wallet'}</span>
+              <span className="whitespace-nowrap">
+                {isConnected && address
+                  ? `${address.slice(0, 5)}…${address.slice(-4)}`
+                  : 'Connect'}
+              </span>
             </motion.button>
 
-            {/* Wallet picker dropdown */}
+            {/* Wallet picker — positioned to stay on screen */}
             <AnimatePresence>
               {walletMenuOpen && !isConnected && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
+                  transition={{ duration: 0.14 }}
+                  // max-w-[calc(100vw-1rem)] prevents the dropdown from going off-screen on phones
                   className="absolute right-0 top-full mt-2 z-50 rounded-2xl overflow-hidden"
                   style={{
-                    width: 260,
+                    width: 'min(260px, calc(100vw - 1rem))',
                     background: 'rgba(10,18,32,0.98)',
                     border: '1px solid rgba(126,179,245,0.18)',
-                    boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(126,179,245,0.08)',
+                    boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
                     backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
                   }}
                 >
                   <div className="px-4 pt-4 pb-2">
@@ -336,7 +379,6 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                     <div className="text-[11px] mt-0.5" style={{ color: 'var(--subtle)' }}>Choose how to connect</div>
                   </div>
                   <div className="px-2 pb-3 space-y-1">
-                    {/* Browser-injected wallets */}
                     {connectors.map(connector => (
                       <button
                         key={connector.id}
@@ -352,15 +394,11 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                             </div>
                         }
                         <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{connector.name}</div>
+                          <div className="text-[13px] font-medium" style={{ color: 'var(--ink)' }}>{connector.name}</div>
                           <div className="text-[11px]" style={{ color: 'var(--subtle)' }}>Browser extension</div>
                         </div>
-                        <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1.5 1l5 4-5 4"/>
-                        </svg>
                       </button>
                     ))}
-                    {/* WalletConnect — lazy loaded */}
                     {WC_PROJECT_ID && (
                       <button
                         onClick={connectWalletConnect}
@@ -375,14 +413,11 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                           </svg>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
-                            {wcConnecting ? 'Opening...' : 'WalletConnect'}
+                          <div className="text-[13px] font-medium" style={{ color: 'var(--ink)' }}>
+                            {wcConnecting ? 'Opening…' : 'WalletConnect'}
                           </div>
-                          <div className="text-[11px]" style={{ color: 'var(--subtle)' }}>Scan QR · all mobile wallets</div>
+                          <div className="text-[11px]" style={{ color: 'var(--subtle)' }}>QR code · all mobile wallets</div>
                         </div>
-                        <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1.5 1l5 4-5 4"/>
-                        </svg>
                       </button>
                     )}
                   </div>
@@ -392,15 +427,15 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
+        {/* Scrollable page content */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
           <AnimatePresence mode="wait">
             <motion.div
               key={state.activeSection}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1.0] }}
+              transition={{ duration: 0.13, ease: [0.25, 0.1, 0.25, 1.0] }}
               className="h-full"
             >
               {children}

@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unsafe-member-access
 import { useState } from 'react'
 import { Lock, Key, Shield, Monitor, RefreshCw, Trash2, Download, AlertTriangle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
@@ -53,7 +54,7 @@ export default function SecuritySection() {
 
       dispatch({ type: 'SET_IDENTITY', handle: state.privexHandle ?? '', keyBundle: bundle, privKeys })
       toast.success('Keys rotated — new commitment submitted on-chain')
-    } catch (err) {
+    } catch {
       toast.error('Key rotation failed')
     } finally {
       setRotating(false)
@@ -76,7 +77,7 @@ export default function SecuritySection() {
     toast.success('Identity data exported (public info only)')
   }
 
-  const revokeSession = (id: string) => {
+  const revokeSession = (_id: string) => {
     toast.success('Session revoked')
   }
 

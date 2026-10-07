@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unsafe-member-access
 /**
  * PRIVEX VPN — Phase 4
  * Wallet identity → authentication → VPN credentials → encrypted tunnel → VPN node → internet

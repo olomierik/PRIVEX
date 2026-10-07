@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send, Lock, Search, Trash2, UserPlus, AlertTriangle,
   Mic, Paperclip, X, Download, Play, Pause, Users, Image,
-  Clock, Check, CheckCheck, Ban, ShieldAlert, Star
+  Clock, Check, CheckCheck, Ban, ShieldAlert, Star, ChevronLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePrivex, type Contact, type LocalMessage, type Group } from '../../lib/store'
@@ -202,6 +202,17 @@ export default function MessagingSection() {
   const activeContact = state.contacts.find(c => c.address === state.activeConversation)
   const activeGroup = state.groups.find(g => g.id === state.activeConversation)
   const isGroup = !!activeGroup
+
+  // Mobile: track whether we're viewing the convo list or the chat panel
+  const [mobileShowChat, setMobileShowChat] = useState(false)
+  const mq = typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)') : null
+  const [isMobile, setIsMobile] = useState(() => mq?.matches ?? false)
+  useEffect(() => {
+    if (!mq) return
+    const h = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [mq])
 
   // Filter contacts by search
   const allConvos = [
@@ -553,7 +564,7 @@ export default function MessagingSection() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-58px)]" style={{ height: 'calc(100dvh - 58px)', position: 'relative' }}>
+    <div className="flex" style={{ height: 'calc(100dvh - 58px)', position: 'relative', overflow: 'hidden' }}>
       <AnimatePresence>
         {showNewGroup && (
           <NewGroupDialog
@@ -565,8 +576,15 @@ export default function MessagingSection() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
-      <div className="w-[260px] flex-shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--border)' }}>
+      {/* Conversation list — full width on mobile when no chat open, fixed width on desktop */}
+      <div
+        className="flex-shrink-0 flex flex-col border-r"
+        style={{
+          borderColor: 'var(--border)',
+          width: isMobile ? '100%' : 260,
+          display: isMobile && mobileShowChat ? 'none' : 'flex',
+        }}
+      >
         {/* Search */}
         <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
           <div className="glass rounded-xl px-3 py-2.5 flex items-center gap-2">
@@ -597,7 +615,7 @@ export default function MessagingSection() {
               return (
                 <button
                   key={convo.id}
-                  onClick={() => dispatch({ type: 'SET_ACTIVE_CONVERSATION', address: convo.id })}
+                  onClick={() => { dispatch({ type: 'SET_ACTIVE_CONVERSATION', address: convo.id }); setMobileShowChat(true) }}
                   className={`w-full px-3 py-3 flex items-center gap-2.5 text-left transition-colors hover:bg-white/5 ${isActive ? 'bg-white/5' : ''}`}
                 >
                   <div
@@ -668,18 +686,29 @@ export default function MessagingSection() {
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* Chat area — full width on mobile when chat open, flex-1 on desktop */}
       {state.activeConversation ? (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0"
+          style={{ display: isMobile && !mobileShowChat ? 'none' : 'flex' }}>
           {/* Chat header */}
-          <div className="px-4 h-[58px] border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-3">
+          <div className="px-3 h-[58px] border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Back button — mobile only */}
+              {isMobile && (
+                <button
+                  onClick={() => { setMobileShowChat(false); dispatch({ type: 'SET_ACTIVE_CONVERSATION', address: '' }) }}
+                  className="p-2 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold flex-shrink-0"
                 style={{ background: isGroup ? 'linear-gradient(135deg,#4f46e5,#1d4ed8)' : 'var(--surface-strong)', color: isGroup ? '#fff' : 'var(--accent)' }}>
                 {isGroup ? <Users size={14} /> : (activeContact?.handle?.[0]?.toUpperCase() ?? '?')}
               </div>
-              <div>
-                <div className="text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>
+              <div className="min-w-0">
+                <div className="text-[14px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
                   {isGroup ? activeGroup.name : (activeContact?.handle ?? shortAddress(state.activeConversation))}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -752,7 +781,7 @@ export default function MessagingSection() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2" onClick={() => { setContextMenu(null); setShowReactPicker(null) }}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-2" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }} onClick={() => { setContextMenu(null); setShowReactPicker(null) }}>
             {!isGroup && !activeContact?.publicKey && (
               <div className="glass rounded-xl p-3 flex items-start gap-2">
                 <AlertTriangle size={12} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: 2 }} />
@@ -917,7 +946,7 @@ export default function MessagingSection() {
                     placeholder={attachedFile ? 'Add a caption...' : 'Encrypted message...'}
                     rows={1}
                     className="bg-transparent flex-1 outline-none resize-none text-[14px] leading-relaxed"
-                    style={{ color: 'var(--ink)', maxHeight: '120px' }}
+                    style={{ color: 'var(--ink)', maxHeight: '120px', touchAction: 'manipulation' }}
                   />
                   <Lock size={10} style={{ color: 'var(--secure)', flexShrink: 0, marginBottom: 2 }} />
                 </div>
@@ -953,7 +982,7 @@ export default function MessagingSection() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : !isMobile ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--surface-strong)' }}>
@@ -975,7 +1004,7 @@ export default function MessagingSection() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Context menu */}
       <AnimatePresence>

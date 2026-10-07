@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Monitor,
-  Lock, AlertTriangle, Users, PhoneMissed, ChevronDown, Check
+  Lock, Users, PhoneMissed, ChevronDown, Check
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -13,11 +13,6 @@ import { useAccount } from 'wagmi'
 type CallState = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended'
 type CallMode = 'voice' | 'video'
 
-interface ParticipantStream {
-  address: string
-  stream: MediaStream
-  videoRef: React.RefObject<HTMLVideoElement>
-}
 
 function formatDuration(s: number): string {
   return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`

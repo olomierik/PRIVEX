@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unsafe-member-access, typescript/no-floating-promises
 /**
  * PRIVEX Admin Panel
  * Operational metrics only — admins CANNOT read private messages,

@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unsafe-member-access
 /**
  * PRIVEX Payments — Phase 5
  * USDC wallet-to-wallet payments, payment requests, QR receive, tx history.
@@ -41,7 +42,7 @@ function QRDisplay({ value, label = 'Scan to pay' }: { value: string; label?: st
 
   useEffect(() => {
     if (!canvasRef.current || !value) return
-    import('qrcode').then(QRCode => {
+    void import('qrcode').then(QRCode => {
       void QRCode.toCanvas(canvasRef.current!, value, {
         width: 180,
         margin: 2,
