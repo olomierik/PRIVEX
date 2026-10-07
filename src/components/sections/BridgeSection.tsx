@@ -17,7 +17,8 @@ import { toast } from 'sonner'
 
 // Chains supported by the bridge
 const CHAIN_KIT_NAME: Record<number, string> = {
-  5042:  'Arc',
+  5042:  'PRIVEX',
+  4663:  'Robinhood',
   1:     'Ethereum',
   8453:  'Base',
   42161: 'Arbitrum',
@@ -30,7 +31,10 @@ function ChainIcon({ chainId, size = 24 }: { chainId: number; size?: number }) {
   const cls = `flex-shrink-0 rounded-full overflow-hidden`
   const s = size
   if (chainId === 5042) return (
-    <img src="/privex-logo.svg" width={s} height={s} alt="Arc" className={cls} style={{ borderRadius: '50%', background: '#0a1628' }} />
+    <img src="/privex-logo.svg" width={s} height={s} alt="PRIVEX" className={cls} style={{ borderRadius: '50%', background: '#0a1628' }} />
+  )
+  if (chainId === 4663) return (
+    <div className={cls} style={{ width: s, height: s, background: '#004aff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: s * 0.45, fontWeight: 700, color: '#fff' }}>R</div>
   )
   if (chainId === 1)     return <NetworkEthereum variant="branded" size={s} className={cls} />
   if (chainId === 8453)  return <NetworkBase variant="branded" size={s} className={cls} />

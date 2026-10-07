@@ -256,6 +256,15 @@ export default function HomeSection() {
   const { connectors, connect } = useConnect()
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copiedPons, setCopiedPons] = useState(false)
+
+  const PONS_TOKEN_ADDRESS = '0xd33761ca681f5311c8f6eb4eb608d8ed771cf77e'
+
+  const copyPonsCA = useCallback(() => {
+    void navigator.clipboard.writeText(PONS_TOKEN_ADDRESS)
+    setCopiedPons(true)
+    setTimeout(() => setCopiedPons(false), 2000)
+  }, [PONS_TOKEN_ADDRESS])
 
   const copyCA = () => {
     void navigator.clipboard.writeText(PVX_TOKEN_ADDRESS)
@@ -447,7 +456,7 @@ export default function HomeSection() {
               { label: 'Fee Burn Rate',     value: '25%',        desc: 'of all service fees auto-burned', color: '#fb923c', icon: Flame },
               { label: 'Treasury Share',    value: '75%',        desc: 'of fees to admin treasury',       color: '#60a5fa', icon: CreditCard },
               { label: 'Burn Mechanic',     value: 'Auto',       desc: 'triggered on every payment',      color: '#a78bfa', icon: Zap },
-              { label: 'Token Standard',    value: 'ERC-20',     desc: 'on Arc Mainnet',                  color: '#34d399', icon: ShieldCheck },
+              { label: 'Token Standard',    value: 'ERC-20',     desc: 'EVM compatible',                  color: '#34d399', icon: ShieldCheck },
             ].map((stat, i) => {
               const Icon = stat.icon
               return (
@@ -481,6 +490,94 @@ export default function HomeSection() {
                 </p>
               </div>
             </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── PONS TOKEN ── */}
+      <section className="relative z-10 px-6 pb-20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div {...fadeUp(0.05)} className="text-center mb-10">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <span className="label-caps">PONS Token</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+                Robinhood Chain
+              </span>
+            </div>
+            <h2 className="display font-bold text-[clamp(1.6rem,4vw,2.4rem)] tracking-tight" style={{ color: 'var(--ink)' }}>
+              The PRIVEX Ecosystem Token
+            </h2>
+            <p className="mt-3 text-[14px] leading-relaxed max-w-xl mx-auto" style={{ color: 'var(--muted)' }}>
+              PONS powers the PRIVEX ecosystem on Robinhood Chain. Trade, hold, and earn while using private communications.
+            </p>
+          </motion.div>
+
+          {/* PONS CA bar */}
+          <motion.div {...fadeUp(0.08)} className="glass rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.22)' }}>
+                <Zap size={15} style={{ color: '#60a5fa' }} />
+              </div>
+              <span className="text-[12px] font-semibold tracking-wide uppercase" style={{ color: 'var(--subtle)' }}>Contract Address</span>
+            </div>
+            <div className="flex-1 font-mono text-[13px] break-all" style={{ color: 'var(--ink-2)' }}>
+              {PONS_TOKEN_ADDRESS}
+            </div>
+            <button onClick={copyPonsCA}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all flex-shrink-0"
+              style={{
+                background: copiedPons ? 'rgba(74,222,128,0.12)' : 'rgba(96,165,250,0.10)',
+                border: `1px solid ${copiedPons ? 'rgba(74,222,128,0.30)' : 'rgba(96,165,250,0.20)'}`,
+                color: copiedPons ? '#4ade80' : 'var(--accent)',
+              }}>
+              <Copy size={12} />
+              {copiedPons ? 'Copied!' : 'Copy'}
+            </button>
+          </motion.div>
+
+          {/* PONS stats */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { label: 'Chain',     value: 'Robinhood', desc: 'Native to Robinhood Chain',    color: '#60a5fa', icon: Globe },
+              { label: 'Platform',  value: 'PONS',      desc: 'Launched on ponsfamily.com',   color: '#a78bfa', icon: Zap },
+              { label: 'Standard',  value: 'ERC-20',    desc: 'EVM compatible token',         color: '#34d399', icon: ShieldCheck },
+            ].map((stat, i) => {
+              const Icon = stat.icon
+              return (
+                <motion.div key={stat.label} {...fadeUp(0.10 + i * 0.06)}
+                  className="glass rounded-2xl p-5 flex flex-col gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: stat.color + '15', border: `1px solid ${stat.color}28` }}>
+                    <Icon size={16} style={{ color: stat.color }} />
+                  </div>
+                  <div>
+                    <div className="text-[22px] font-bold tracking-tight mb-0.5" style={{ color: stat.color }}>{stat.value}</div>
+                    <div className="text-[12px] font-semibold mb-1" style={{ color: 'var(--ink-2)' }}>{stat.label}</div>
+                    <div className="text-[11px] leading-snug" style={{ color: 'var(--subtle)' }}>{stat.desc}</div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+
+          {/* Buy PONS CTA */}
+          <motion.div {...fadeUp(0.22)} className="glass-mid rounded-2xl p-6 mt-4 flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex-1">
+              <div className="font-semibold text-[14px] mb-1" style={{ color: 'var(--ink)' }}>Get PONS on ponsfamily.com</div>
+              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+                Trade PONS directly on Robinhood Chain. Connect your wallet, switch to Robinhood Chain, and swap ETH for PONS instantly.
+              </p>
+            </div>
+            <a
+              href="https://ponsfamily.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold flex-shrink-0 transition-all hover:opacity-90"
+              style={{ background: 'var(--accent)', color: '#fff' }}>
+              Buy PONS <ArrowRight size={14} />
+            </a>
           </motion.div>
         </div>
       </section>
@@ -528,8 +625,11 @@ export default function HomeSection() {
               <Twitter size={14} />
               <span>@privex2026</span>
             </a>
-            <span className="text-[11px]" style={{ color: 'var(--subtle)', opacity: 0.4 }}>
+            <span className="text-[11px]" style={{ color: 'var(--subtle)', opacity: 0.5 }}>
               PVX: {PVX_TOKEN_ADDRESS.slice(0, 6)}…{PVX_TOKEN_ADDRESS.slice(-4)}
+            </span>
+            <span className="text-[11px]" style={{ color: 'var(--subtle)', opacity: 0.5 }}>
+              PONS: {PONS_TOKEN_ADDRESS.slice(0, 6)}…{PONS_TOKEN_ADDRESS.slice(-4)}
             </span>
           </div>
         </div>

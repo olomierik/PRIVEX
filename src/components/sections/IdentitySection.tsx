@@ -12,7 +12,7 @@ import { ARC_MAINNET_ID } from '../../config'
 
 const ACCESS_MANAGER_ADDRESS = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as `0x${string}` | undefined
 
-const ARC_TESTNET_ID = ARC_MAINNET_ID  // Arc Mainnet (5042)
+const CHAIN_ID = ARC_MAINNET_ID
 
 /**
  * PVX tiers are UPGRADES, not gates.
@@ -139,7 +139,7 @@ export default function IdentitySection() {
         abi: ACCESS_MANAGER_ABI,
         functionName: 'registerIdentity',
         args: [cleanHandle, commitment],
-        chainId: ARC_TESTNET_ID,
+        chainId: CHAIN_ID,
       })
       dispatch({ type: 'SET_IDENTITY', handle: cleanHandle, keyBundle: bundle, privKeys: state.privKeys! })
       // Publish handle → wallet mapping to Supabase for off-chain resolution
@@ -167,7 +167,7 @@ export default function IdentitySection() {
       abi: ACCESS_MANAGER_ABI,
       functionName: 'updateCommitment',
       args: [newCommitment],
-      chainId: ARC_TESTNET_ID,
+      chainId: CHAIN_ID,
     })
     toast.success('Key rotation initiated — transaction pending')
   }
@@ -304,7 +304,7 @@ export default function IdentitySection() {
               <div className="glass rounded-xl p-3 flex items-center gap-2">
                 <CheckCircle size={12} style={{ color: 'var(--secure)' }} />
                 <span className="text-xs" style={{ color: 'var(--secure)' }}>Registered on-chain</span>
-                <a href={buildTxExplorerUrl(ARC_TESTNET_ID, hash)} target="_blank" rel="noopener noreferrer" className="ml-auto text-xs" style={{ color: 'var(--accent)' }}>View</a>
+                <a href={buildTxExplorerUrl(CHAIN_ID, hash)} target="_blank" rel="noopener noreferrer" className="ml-auto text-xs" style={{ color: 'var(--accent)' }}>View</a>
               </div>
             )}
           </div>

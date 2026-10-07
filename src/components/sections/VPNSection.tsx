@@ -20,7 +20,7 @@ import { usePrivex } from '../../lib/store'
 import { getUsdc } from '@/onchain-facts'
 import { parseAmount } from '@/onchain-money'
 
-const ARC_TESTNET_ID = 5042002
+const ARC_TESTNET_ID = 5042 // Arc Mainnet
 
 interface VPNLocation {
   id: string
@@ -376,7 +376,7 @@ export default function VPNSection() {
           {tab === 'plans' && (
             <div className="space-y-3">
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                Pay with USDC on Arc. PRIVEX token holders receive automatic discounts.
+                Pay with USDC. PRIVEX token holders receive automatic discounts.
               </p>
               {VPN_PLANS.map(plan => (
                 <div key={plan.id} className={`glass-strong rounded-2xl p-5 relative overflow-hidden ${activeSubscription?.id === plan.id ? 'ring-1 ring-[var(--secure)]' : ''}`}>

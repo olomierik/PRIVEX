@@ -312,7 +312,7 @@ export default function SettingsSection() {
             <h2 className="display font-semibold text-base" style={{ color: 'var(--ink)' }}>About PRIVEX</h2>
           </div>
           <div className="space-y-3 text-sm" style={{ color: 'var(--muted)' }}>
-            <p>PRIVEX is a Web3 privacy protocol providing E2E encrypted messaging, calls, email, USDC payments, swaps, and cross-chain bridging — anchored by blockchain identity on Arc Mainnet.</p>
+            <p>PRIVEX is a Web3 privacy protocol providing E2E encrypted messaging, calls, email, USDC payments, swaps, and cross-chain bridging — anchored by your wallet identity.</p>
             <p>PRIVEX token (PVX) unlocks power features. It is a utility token — not a security or investment vehicle.</p>
             <p>All cryptographic operations use the WebCrypto API with ECDH P-256 + AES-GCM 256-bit. No proprietary algorithms.</p>
             <div className="flex gap-4 pt-2 flex-wrap">
@@ -325,7 +325,7 @@ export default function SettingsSection() {
           <div className="mt-5 pt-4 border-t space-y-2" style={{ borderColor: 'var(--border)' }}>
             {[
               { label: 'Version', value: 'Phase 4–7 MVP' },
-              { label: 'Network', value: 'Arc Mainnet' },
+              { label: 'Network', value: 'EVM Mainnet' },
               { label: 'Encryption', value: 'ECDH P-256 + AES-GCM 256', highlight: true },
             ].map(r => (
               <div key={r.label} className="flex justify-between text-sm">

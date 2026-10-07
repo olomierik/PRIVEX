@@ -22,7 +22,7 @@ import { parseAmount, Amount, usdcDecimalsFor } from '@/onchain-money'
 import { usePrivex } from '../../lib/store'
 import { ARC_MAINNET_ID } from '../../config'
 
-const ARC_TESTNET_ID = ARC_MAINNET_ID  // Arc Mainnet (5042)
+const CHAIN_ID = ARC_MAINNET_ID
 
 type Tab = 'send' | 'receive' | 'history' | 'request'
 
@@ -63,7 +63,7 @@ export default function PaymentsSection() {
   const { address, chainId } = useAccount()
   const { state } = usePrivex()
   const { switchChain } = useSwitchChain()
-  const publicClient = usePublicClient({ chainId: ARC_TESTNET_ID })
+  const publicClient = usePublicClient({ chainId: CHAIN_ID })
 
   const [tab, setTab] = useState<Tab>('send')
   const [recipient, setRecipient] = useState('')
@@ -77,16 +77,16 @@ export default function PaymentsSection() {
   const [requestLink, setRequestLink] = useState('')
   const [privateNote, setPrivateNote] = useState('')
 
-  const usdcFact = getUsdc(ARC_TESTNET_ID)
+  const usdcFact = getUsdc(CHAIN_ID)
   // Only flag wrong chain when a wallet is actually connected
-  const isWrongChain = !!address && chainId !== ARC_TESTNET_ID
+  const isWrongChain = !!address && chainId !== CHAIN_ID
 
   const { data: balance, refetch: refetchBalance } = useReadContract({
     address: usdcFact?.address as `0x${string}`,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: ARC_TESTNET_ID,
+    chainId: CHAIN_ID,
     query: { enabled: !!address && !!usdcFact },
   })
 
@@ -94,7 +94,7 @@ export default function PaymentsSection() {
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   const formattedBalance = balance !== undefined
-    ? Amount.fromRaw(balance, usdcDecimalsFor(ARC_TESTNET_ID)).toFixed(2)
+    ? Amount.fromRaw(balance, usdcDecimalsFor(CHAIN_ID)).toFixed(2)
     : '—'
 
   // On successful tx: add to history, clear form, refetch balance
@@ -187,7 +187,7 @@ export default function PaymentsSection() {
   }, [tab, address])  // eslint-disable-line
 
   const handleSend = () => {
-    if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_ID }); return }
+    if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
     const isHandle = recipient.includes('@privex') || /^[a-z0-9]{3,32}$/.test(recipient)
     if (!isAddress(recipient) && !isHandle) { toast.error('Enter a valid address or @privex handle'); return }
     if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
@@ -195,14 +195,14 @@ export default function PaymentsSection() {
     if (!isAddress(recipient)) { toast.error('Handle lookup not yet live — paste the wallet address directly'); return }
     reset()
     let parsed: bigint
-    try { parsed = parseAmount(ARC_TESTNET_ID, amount).raw }
+    try { parsed = parseAmount(CHAIN_ID, amount).raw }
     catch { toast.error('Invalid amount'); return }
     writeContract({
       address: usdcFact.address as `0x${string}`,
       abi: erc20Abi,
       functionName: 'transfer',
       args: [recipient, parsed],
-      chainId: ARC_TESTNET_ID,
+      chainId: CHAIN_ID,
     })
   }
 
@@ -237,7 +237,7 @@ export default function PaymentsSection() {
           <TokenUSDC variant="branded" size={36} />
           <div>
             <div className="display text-3xl font-bold tabular" style={{ color: 'var(--ink)' }}>{formattedBalance}</div>
-            <div className="text-xs" style={{ color: 'var(--muted)' }}>Arc Mainnet · USDC</div>
+            <div className="text-xs" style={{ color: 'var(--muted)' }}>USDC · Onchain</div>
           </div>
           <button onClick={() => void refetchBalance()} className="ml-auto p-2 rounded-lg transition-colors hover:bg-white/5">
             <RefreshCw size={13} style={{ color: 'var(--muted)' }} />
@@ -260,8 +260,8 @@ export default function PaymentsSection() {
       {isWrongChain && tab !== 'history' && (
         <div className="glass rounded-xl p-3 flex items-center gap-2">
           <AlertTriangle size={12} style={{ color: 'var(--warning)' }} />
-          <span className="text-xs" style={{ color: 'var(--warning)' }}>Wrong network — switch to Arc for payments</span>
-          <button onClick={() => switchChain({ chainId: ARC_TESTNET_ID })} className="ml-auto text-xs font-semibold" style={{ color: 'var(--accent)' }}>Switch</button>
+          <span className="text-xs" style={{ color: 'var(--warning)' }}>Wrong network — switch for payments</span>
+          <button onClick={() => switchChain({ chainId: CHAIN_ID })} className="ml-auto text-xs font-semibold" style={{ color: 'var(--accent)' }}>Switch</button>
         </div>
       )}
 
@@ -303,7 +303,7 @@ export default function PaymentsSection() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Amount (USDC)</label>
-              <button onClick={() => balance && setAmount(Amount.fromRaw(balance, usdcDecimalsFor(ARC_TESTNET_ID)).toFixed(6))}
+              <button onClick={() => balance && setAmount(Amount.fromRaw(balance, usdcDecimalsFor(CHAIN_ID)).toFixed(6))}
                 className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Max</button>
             </div>
             <div className="glass rounded-xl px-3 py-2.5 flex items-center gap-2">
@@ -360,7 +360,7 @@ export default function PaymentsSection() {
             <div className="glass rounded-xl p-3 flex items-center gap-2">
               <CheckCircle size={13} style={{ color: 'var(--secure)' }} />
               <span className="text-xs" style={{ color: 'var(--secure)' }}>Transaction confirmed</span>
-              <a href={buildTxExplorerUrl(ARC_TESTNET_ID, hash)} target="_blank" rel="noopener noreferrer"
+              <a href={buildTxExplorerUrl(CHAIN_ID, hash)} target="_blank" rel="noopener noreferrer"
                 className="ml-auto flex items-center gap-1 text-xs" style={{ color: 'var(--accent)' }}>
                 <ExternalLink size={10} />View
               </a>
@@ -487,7 +487,7 @@ export default function PaymentsSection() {
                       {tx.direction === 'out' ? '-' : '+'}{tx.amount} USDC
                     </div>
                     {tx.hash !== '0x' && (
-                      <a href={buildTxExplorerUrl(ARC_TESTNET_ID, tx.hash)} target="_blank" rel="noopener noreferrer"
+                      <a href={buildTxExplorerUrl(CHAIN_ID, tx.hash)} target="_blank" rel="noopener noreferrer"
                         className="text-xs flex items-center gap-0.5 justify-end" style={{ color: 'var(--accent)' }}>
                         <ExternalLink size={9} />View
                       </a>

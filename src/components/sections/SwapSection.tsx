@@ -36,7 +36,8 @@ const RATES: Record<string, number> = {
 }
 
 const NETWORKS = [
-  { chainId: 5042,  name: 'Arc',      icon: <img src="/privex-logo.svg" width={16} height={16} alt="Arc" style={{ borderRadius: '50%', background: '#0a1628' }} /> },
+  { chainId: 5042,  name: 'PRIVEX',   icon: <img src="/privex-logo.svg" width={16} height={16} alt="PRIVEX" style={{ borderRadius: '50%', background: '#0a1628' }} /> },
+  { chainId: 4663,  name: 'Robinhood',icon: <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#004aff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff' }}>R</div> },
   { chainId: 1,     name: 'Ethereum', icon: <NetworkEthereum variant="branded" size={16} /> },
   { chainId: 8453,  name: 'Base',     icon: <NetworkBase     variant="branded" size={16} /> },
   { chainId: 42161, name: 'Arbitrum', icon: <NetworkArbitrumOne variant="branded" size={16} /> },

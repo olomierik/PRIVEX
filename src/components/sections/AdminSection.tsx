@@ -72,7 +72,7 @@ const SERVICES: SystemService[] = [
   { name: 'Email Relay', status: 'operational', latency: 18, uptime: '99.94%' },
   { name: 'WebRTC Signaling', status: 'operational', latency: 8, uptime: '99.99%' },
   { name: 'VPN Provisioning', status: 'operational', latency: 45, uptime: '99.89%' },
-  { name: 'Arc RPC', status: 'operational', latency: 23, uptime: '99.95%' },
+  { name: 'Chain RPC', status: 'operational', latency: 23, uptime: '99.95%' },
   { name: 'CCTP Bridge', status: 'operational', latency: 180, uptime: '99.91%' },
   { name: 'Identity Registry', status: 'operational', latency: 15, uptime: '100%' },
 ]

@@ -106,7 +106,7 @@ export default function AuthGate() {
           {[
             { icon: Lock, label: 'End-to-end encrypted messaging' },
             { icon: Key, label: 'Keys generated locally — never shared' },
-            { icon: Shield, label: 'Wallet-anchored identity on Arc' },
+            { icon: Shield, label: 'Wallet-anchored identity' },
           ].map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-2.5">
               <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--secure-dim)' }}>
