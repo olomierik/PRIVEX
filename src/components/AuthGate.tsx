@@ -1,4 +1,4 @@
-// oxlint-disable typescript/no-unsafe-member-access, typescript/no-floating-promises
+// oxlint-disable typescript/no-unsafe-member-access, typescript/no-floating-promises, typescript/no-unsafe-assignment, typescript/no-unsafe-argument
 /**
  * PRIVEX Authentication Gate
  * Wallet-signature challenge/response flow.

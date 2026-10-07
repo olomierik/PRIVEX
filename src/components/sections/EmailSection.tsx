@@ -1,4 +1,4 @@
-// oxlint-disable typescript/no-unsafe-member-access
+// oxlint-disable typescript/no-unsafe-member-access, typescript/no-unsafe-assignment, typescript/no-unsafe-argument
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Mail, Send, Lock, Inbox, Paperclip, Search, ChevronRight,

@@ -1,4 +1,4 @@
-// oxlint-disable typescript/no-unsafe-member-access
+// oxlint-disable typescript/no-unsafe-member-access, typescript/no-unsafe-assignment, typescript/no-unsafe-argument
 import { useState } from 'react'
 import { Lock, Key, Shield, Monitor, RefreshCw, Trash2, Download, AlertTriangle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'

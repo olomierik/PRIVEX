@@ -15,7 +15,7 @@ import IdentitySection from './components/sections/IdentitySection'
 import SecuritySection from './components/sections/SecuritySection'
 import SettingsSection from './components/sections/SettingsSection'
 import AdminSection from './components/sections/AdminSection'
-import { healthCheck, setWalletAddress } from './lib/relay'
+import { healthCheck, setWalletAddress, publishPubkey } from './lib/relay'
 import { loadOrCreateKeys } from './lib/crypto'
 
 function SectionContent({ section }: { section: NavSection }) {
@@ -57,6 +57,10 @@ function AppInner() {
         const handle = state.privexHandle ?? ''
         dispatch({ type: 'SET_IDENTITY', handle, keyBundle: bundle, privKeys })
         dispatch({ type: 'AUTH_SUCCESS', token: address })
+        // Publish public key to Supabase so contacts can encrypt messages to us
+        if (bundle?.encryptionPubkey) {
+          void publishPubkey(bundle.encryptionPubkey as string)
+        }
       } catch {
         // silent — user can retry from Security section
       }

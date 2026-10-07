@@ -2,7 +2,7 @@
  * PRIVEX relay — backed by Supabase Realtime + Postgres.
  * All message payloads are ciphertext. This module never handles plaintext.
  */
-import { supabase, type DbMessage, type DbSignal, type DbEmail } from './supabase'
+import { supabase, setSupabaseWallet, type DbMessage, type DbSignal, type DbEmail, type DbPubkey } from './supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 // ─── Legacy compat types (keep shape identical so MessagingSection needs no changes) ──
@@ -58,7 +58,10 @@ let _walletAddress: string | null = null
 
 export function setToken(_t: string | null): void { /* no-op */ }
 export function getToken(): string | null { return null }
-export function setWalletAddress(addr: string | null): void { _walletAddress = addr }
+export function setWalletAddress(addr: string | null): void {
+  _walletAddress = addr
+  setSupabaseWallet(addr)   // inject x-wallet-address header for RLS
+}
 
 // ─── Health ──────────────────────────────────────────────────────────────────
 
@@ -363,4 +366,26 @@ export async function fetchDrafts(): Promise<RelayEmail[]> {
 
 export async function deleteDraft(id: string): Promise<void> {
   await supabase.from('emails').delete().eq('id', id)
+}
+
+// ─── Public key registry ──────────────────────────────────────────────────────
+// Allows users to discover each other's encryption keys by wallet address.
+
+export async function publishPubkey(pubkeyHex: string): Promise<void> {
+  if (!_walletAddress) return
+  await supabase.from('pubkeys').upsert({
+    wallet_addr: _walletAddress.toLowerCase(),
+    pubkey_hex: pubkeyHex,
+    updated_at: Date.now(),
+  }, { onConflict: 'wallet_addr' })
+}
+
+export async function fetchPubkey(walletAddr: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('pubkeys')
+    .select('pubkey_hex')
+    .eq('wallet_addr', walletAddr.toLowerCase())
+    .single()
+  if (error || !data) return null
+  return (data as DbPubkey).pubkey_hex
 }

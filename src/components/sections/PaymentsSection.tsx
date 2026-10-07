@@ -1,4 +1,4 @@
-// oxlint-disable typescript/no-unsafe-member-access
+// oxlint-disable typescript/no-unsafe-member-access, typescript/no-unsafe-assignment, typescript/no-unsafe-argument
 /**
  * PRIVEX Payments — Phase 5
  * USDC wallet-to-wallet payments, payment requests, QR receive, tx history.
