@@ -3,7 +3,7 @@
  * USDC wallet-to-wallet payments, payment requests, QR receive, tx history.
  * Clearly distinguishes public (on-chain visible) vs future private payment paths.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   useAccount, useReadContract, useWriteContract,
   useWaitForTransactionReceipt, useSwitchChain, usePublicClient,
@@ -19,9 +19,9 @@ import { TokenUSDC } from '@web3icons/react'
 import { getUsdc, buildTxExplorerUrl } from '@/onchain-facts'
 import { parseAmount, Amount, usdcDecimalsFor } from '@/onchain-money'
 import { usePrivex } from '../../lib/store'
-import { ARC_CHAIN_ID } from '../../config'
+import { ARC_MAINNET_ID } from '../../config'
 
-const ARC_TESTNET_ID = ARC_CHAIN_ID  // Arc Mainnet (5042)
+const ARC_TESTNET_ID = ARC_MAINNET_ID  // Arc Mainnet (5042)
 
 type Tab = 'send' | 'receive' | 'history' | 'request'
 
@@ -35,27 +35,25 @@ interface TxRecord {
   confirmed: boolean
 }
 
-// Simple QR code using SVG (no external lib needed)
-function QRDisplay({ value }: { value: string }) {
-  // Generate a deterministic visual pattern from the value (not a real QR scanner-compatible code)
-  // In production, use qrcode.react or similar
-  const hash = value.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) & 0xffff, 0)
-  const cells = Array.from({ length: 11 }, (_, row) =>
-    Array.from({ length: 11 }, (_, col) => {
-      if (row < 3 && col < 3) return true
-      if (row < 3 && col > 7) return true
-      if (row > 7 && col < 3) return true
-      return (((hash >> ((row * 11 + col) % 16)) & 1) === 1)
+// Real scannable QR code using qrcode library
+function QRDisplay({ value, label = 'Scan to pay' }: { value: string; label?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    if (!canvasRef.current || !value) return
+    import('qrcode').then(QRCode => {
+      void QRCode.toCanvas(canvasRef.current!, value, {
+        width: 180,
+        margin: 2,
+        color: { dark: '#f0f6ff', light: '#0a1020' },
+      })
     })
-  )
+  }, [value])
+
   return (
-    <div className="inline-block glass-strong p-3 rounded-xl">
-      <div className="grid gap-0.5" style={{ gridTemplateColumns: 'repeat(11, 1fr)', width: 110 }}>
-        {cells.flat().map((filled, i) => (
-          <div key={i} className="rounded-sm" style={{ width: 8, height: 8, background: filled ? 'var(--ink)' : 'transparent' }} />
-        ))}
-      </div>
-      <p className="text-xs text-center mt-2" style={{ color: 'var(--subtle)' }}>Scan to pay</p>
+    <div className="inline-flex flex-col items-center glass-strong p-3 rounded-2xl gap-2">
+      <canvas ref={canvasRef} className="rounded-xl" />
+      <p className="text-xs font-medium" style={{ color: 'var(--subtle)' }}>{label}</p>
     </div>
   )
 }
@@ -189,9 +187,11 @@ export default function PaymentsSection() {
 
   const handleSend = () => {
     if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_ID }); return }
-    if (!isAddress(recipient)) { toast.error('Invalid recipient address'); return }
+    const isHandle = recipient.includes('@privex') || /^[a-z0-9]{3,32}$/.test(recipient)
+    if (!isAddress(recipient) && !isHandle) { toast.error('Enter a valid address or @privex handle'); return }
     if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
     if (!usdcFact) { toast.error('USDC not available on this chain'); return }
+    if (!isAddress(recipient)) { toast.error('Handle lookup not yet live — paste the wallet address directly'); return }
     reset()
     let parsed: bigint
     try { parsed = parseAmount(ARC_TESTNET_ID, amount).raw }
@@ -273,8 +273,8 @@ export default function PaymentsSection() {
               placeholder="0x... wallet address or handle@privex"
               className="w-full glass rounded-xl px-3 py-2.5 text-xs outline-none mono"
               style={{ color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }} />
-            {recipient && !isAddress(recipient) && !recipient.includes('@privex') && (
-              <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>Invalid address format</p>
+            {recipient && !isAddress(recipient) && !recipient.includes('@privex') && !/^[a-z0-9]{3,32}$/.test(recipient) && (
+              <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>Enter a valid 0x address or @privex handle</p>
             )}
             {/* Contact suggestions */}
             {recipient.length > 2 && state.contacts.filter(c =>

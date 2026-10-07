@@ -95,7 +95,7 @@ export default function EmailSection() {
 
   // Poll for new emails
   useEffect(() => {
-    if (!state.isAuthenticated || !state.privKeys) return
+    if (!address || !state.privKeys) return
     let lastFetch = 0
 
     const poll = async () => {
@@ -108,7 +108,7 @@ export default function EmailSection() {
     void poll()
     const interval = setInterval(() => { void poll() }, 15_000)
     return () => clearInterval(interval)
-  }, [state.isAuthenticated, state.privKeys, decryptAndIngest])
+  }, [address, state.privKeys, decryptAndIngest])
 
   // Disappearing email sweep
   useEffect(() => {
@@ -287,12 +287,13 @@ export default function EmailSection() {
     setSelectedEmail(null)
   }
 
-  if (!state.isAuthenticated) {
+  if (!address) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
           <Mail size={32} style={{ color: 'var(--subtle)' }} className="mx-auto" />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Authenticate to access private email</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Connect your wallet to access email</p>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Your wallet address is your identity — no account needed</p>
         </div>
       </div>
     )

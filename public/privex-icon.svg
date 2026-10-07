@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="gP" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#00c8ff"/>
+      <stop offset="48%"  stop-color="#3a6cff"/>
+      <stop offset="100%" stop-color="#8c3dff"/>
+    </linearGradient>
+    <linearGradient id="gL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+
+  <!-- P stem -->
+  <rect x="22" y="12" width="30" height="148" rx="10" fill="url(#gP)"/>
+  <!-- P top bar -->
+  <rect x="22" y="12" width="126" height="48" rx="10" fill="url(#gP)"/>
+  <!-- P bowl right curve -->
+  <path d="M 120 12 Q 158 12 158 46 Q 158 80 120 80 L 52 80 L 52 60 L 120 60 Q 136 60 136 46 Q 136 32 120 32 Z"
+    fill="url(#gP)"/>
+  <!-- Stem connector -->
+  <rect x="22" y="60" width="30" height="22" fill="url(#gP)"/>
+
+  <!-- P leg (diagonal R-style) -->
+  <path d="M 96 80 L 132 80 L 168 148 Q 174 160 165 165 Q 156 170 150 158 L 116 90 L 52 90 L 52 80 Z"
+    fill="url(#gP)"/>
+
+  <!-- Chat bubble cutout -->
+  <rect x="30" y="18" width="110" height="52" rx="12" fill="#050505"/>
+  <path d="M 38 70 L 28 88 L 62 70 Z" fill="#050505"/>
+  <!-- Three dots -->
+  <circle cx="64"  cy="44" r="6" fill="#00ccff"/>
+  <circle cx="85"  cy="44" r="6" fill="#00ccff"/>
+  <circle cx="106" cy="44" r="6" fill="#00ccff"/>
+
+  <!-- Lock icon -->
+  <rect x="118" y="104" width="44" height="36" rx="7" fill="url(#gL)"/>
+  <path d="M 126 104 L 126 92 Q 126 76 140 76 Q 154 76 154 92 L 154 104"
+    fill="none" stroke="url(#gL)" stroke-width="9" stroke-linecap="round"/>
+  <!-- Keyhole -->
+  <circle cx="140" cy="120" r="5" fill="#050505"/>
+  <rect x="138" y="124" width="4" height="8" rx="2" fill="#050505"/>
+</svg>

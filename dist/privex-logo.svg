@@ -1,60 +1,143 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 430">
   <defs>
-    <!-- Main blue-to-violet gradient for the P letterform -->
-    <linearGradient id="pvxGrad" x1="120" y1="60" x2="280" y2="320" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00d4ff"/>
-      <stop offset="40%" stop-color="#3b82f6"/>
-      <stop offset="75%" stop-color="#6d28d9"/>
+    <linearGradient id="gP" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#00c8ff"/>
+      <stop offset="48%"  stop-color="#3a6cff"/>
+      <stop offset="100%" stop-color="#8c3dff"/>
+    </linearGradient>
+    <linearGradient id="gLock" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#2563eb"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
-    <!-- Lighter overlay gradient for the curved highlight -->
-    <linearGradient id="pvxHighlight" x1="130" y1="70" x2="240" y2="180" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.35)"/>
-      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    <linearGradient id="gX" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#00c8ff"/>
+      <stop offset="100%" stop-color="#8c3dff"/>
     </linearGradient>
-    <!-- Lock gradient -->
-    <linearGradient id="lockGrad" x1="230" y1="230" x2="300" y2="320" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
-    </linearGradient>
-    <!-- Drop shadow filter -->
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
 
-  <!-- ── P letterform ── -->
-  <!-- Vertical left stroke of P -->
-  <rect x="112" y="62" width="48" height="240" rx="24" fill="url(#pvxGrad)" filter="url(#glow)"/>
+  <!-- Background black square -->
+  <rect width="400" height="430" fill="#000000"/>
 
-  <!-- Upper-right bowl of P (outer arc) -->
-  <path d="M158 62 h60 a72 72 0 0 1 0 144 h-60 z" fill="url(#pvxGrad)" filter="url(#glow)"/>
+  <!-- ============================================================
+       P LETTERFORM
+       The P has a thick rounded stem on the left, a bowl on the
+       upper-right with a chat-bubble cut out, and the leg extends
+       diagonally to the lower-right (like a stylised R leg).
+       ============================================================ -->
 
-  <!-- Inner cutout of P bowl (makes it hollow) -->
-  <path d="M160 100 h50 a36 36 0 0 1 0 72 h-50 z" fill="transparent"/>
+  <!-- Outer P shape (filled gradient) -->
+  <!-- Stem: x 80–134, full height 32–290 -->
+  <!-- Bowl top: extends from x=80 to x=278, y=32 to y=185 -->
+  <!-- Leg: diagonal from bottom of bowl ~x=200,y=185 to x=295,y=290 -->
+  <path d="
+    M 100 32
+    L 100 290
+    Q 100 308 118 308
+    L 148 308
+    L 148 210
+    L 220 210
+    Q 285 210 325 168
+    Q 362 128 362 76
+    Q 362 44 340 24
+    Q 318 4  280 4
+    L 118 4
+    Q 100 4 100 22
+    Z
+  " fill="none"/>
 
-  <!-- Curved tail / diagonal stroke of P (bottom-right sweep) -->
-  <path d="M158 206 L240 302 Q256 326 234 338 Q212 350 198 328 L128 228 z" fill="url(#pvxGrad)" filter="url(#glow)"/>
+  <!-- Cleaner approach: draw the full P as a compound path -->
+  <!-- Stem rectangle with rounded left corners -->
+  <rect x="80" y="28" width="58" height="278" rx="18" fill="url(#gP)"/>
 
-  <!-- Highlight sheen on P -->
-  <path d="M112 86 Q140 62 200 70 Q240 76 262 106 Q242 90 210 86 Q172 82 136 96 z" fill="url(#pvxHighlight)"/>
+  <!-- Bowl top rounded rectangle -->
+  <rect x="80" y="28" width="240" height="92" rx="18" fill="url(#gP)"/>
 
-  <!-- ── Chat bubble inside the P bowl ── -->
-  <rect x="162" y="108" width="80" height="54" rx="16" fill="#03080f" stroke="rgba(0,212,255,0.6)" stroke-width="2"/>
-  <!-- Three dots -->
-  <circle cx="183" cy="135" r="5.5" fill="#00d4ff"/>
-  <circle cx="202" cy="135" r="5.5" fill="#00d4ff"/>
-  <circle cx="221" cy="135" r="5.5" fill="#00d4ff"/>
-  <!-- Chat bubble tail -->
-  <path d="M168 162 L162 178 L182 165 z" fill="#03080f" stroke="rgba(0,212,255,0.6)" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Bowl right vertical + bottom arc — P bowl right side -->
+  <path d="
+    M 272 28
+    Q 332 28 332 88
+    Q 332 148 272 148
+    L 138 148
+    L 138 120
+    L 272 120
+    Q 302 120 302 88
+    Q 302 56 272 56
+    Z
+  " fill="url(#gP)"/>
 
-  <!-- ── Lock icon (bottom-right of P tail) ── -->
+  <!-- Connect bowl bottom to stem -->
+  <rect x="80" y="120" width="58" height="30" fill="url(#gP)"/>
+
+  <!-- Diagonal leg (bottom right of P, styled like an R) -->
+  <path d="
+    M 192 148
+    L 250 148
+    L 318 270
+    Q 328 288 314 298
+    Q 300 308 288 290
+    L 222 168
+    L 138 168
+    L 138 148
+    Z
+  " fill="url(#gP)"/>
+
+  <!-- ============================================================
+       CHAT BUBBLE CUTOUT inside the P bowl
+       Positioned roughly x=110 to x=290, y=38 to y=130
+       Black fill with rounded rect + tail pointing down-left
+       ============================================================ -->
+  <rect x="108" y="42" width="188" height="90" rx="22" fill="#050505"/>
+  <!-- Tail -->
+  <path d="M 120 132 L 108 158 L 148 132 Z" fill="#050505"/>
+
+  <!-- Three dots in chat bubble (cyan) -->
+  <circle cx="168" cy="87" r="10" fill="#00ccff"/>
+  <circle cx="204" cy="87" r="10" fill="#00ccff"/>
+  <circle cx="240" cy="87" r="10" fill="#00ccff"/>
+
+  <!-- ============================================================
+       LOCK ICON — positioned at lower-right of the P bowl area
+       ============================================================ -->
   <!-- Lock body -->
-  <rect x="234" y="268" width="56" height="44" rx="10" fill="url(#lockGrad)" filter="url(#glow)"/>
-  <!-- Lock shackle -->
-  <path d="M248 268 v-16 a14 14 0 0 1 28 0 v16" stroke="url(#lockGrad)" stroke-width="10" stroke-linecap="round" fill="none" filter="url(#glow)"/>
+  <rect x="246" y="196" width="74" height="60" rx="10" fill="url(#gLock)"/>
+  <!-- Shackle arc -->
+  <path d="M 260 196 L 260 174 Q 260 148 283 148 Q 306 148 306 174 L 306 196"
+    fill="none" stroke="url(#gLock)" stroke-width="14" stroke-linecap="round"/>
   <!-- Keyhole -->
-  <circle cx="262" cy="286" r="6" fill="#03080f"/>
-  <rect x="259" y="288" width="6" height="10" rx="3" fill="#03080f"/>
+  <circle cx="283" cy="222" r="8" fill="#050505"/>
+  <path d="M 280 228 L 280 242 Q 280 247 283 247 Q 286 247 286 242 L 286 228 Z" fill="#050505"/>
+
+  <!-- ============================================================
+       WORDMARK: PRIVE in white, X in gradient
+       ============================================================ -->
+  <!-- We use foreignObject for precise font rendering is not reliable;
+       use text with font-family stack instead -->
+
+  <!-- "PRIVE" -->
+  <text
+    x="28" y="360"
+    font-family="'Arial Black','Impact','Helvetica Neue',Arial,sans-serif"
+    font-weight="900"
+    font-size="76"
+    letter-spacing="-1"
+    fill="#ffffff">PRIVE</text>
+
+  <!-- "X" gradient -->
+  <text
+    x="320" y="360"
+    font-family="'Arial Black','Impact','Helvetica Neue',Arial,sans-serif"
+    font-weight="900"
+    font-size="76"
+    letter-spacing="-1"
+    fill="url(#gX)">X</text>
+
+  <!-- Subtitle -->
+  <text
+    x="200" y="393"
+    font-family="Arial,Helvetica,sans-serif"
+    font-weight="400"
+    font-size="14"
+    letter-spacing="2.8"
+    text-anchor="middle"
+    fill="#9ca3af">PRIVATE MESSAGING &amp; SECURE COMM PROTOCOL</text>
 </svg>

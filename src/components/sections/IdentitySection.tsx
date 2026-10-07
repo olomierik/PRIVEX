@@ -7,11 +7,11 @@ import { computeCommitment, loadOrCreateKeys, deleteLocalKeys } from '../../lib/
 import { ACCESS_MANAGER_ABI } from '../../lib/abis'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 
-import { ARC_CHAIN_ID } from '../../config'
+import { ARC_MAINNET_ID } from '../../config'
 
 const ACCESS_MANAGER_ADDRESS = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as `0x${string}` | undefined
 
-const ARC_TESTNET_ID = ARC_CHAIN_ID  // Arc Mainnet (5042)
+const ARC_TESTNET_ID = ARC_MAINNET_ID  // Arc Mainnet (5042)
 
 /**
  * PVX tiers are UPGRADES, not gates.

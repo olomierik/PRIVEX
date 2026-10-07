@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Shield, Lock, Key, AlertTriangle } from 'lucide-react'
 import { useAccount, useSignMessage } from 'wagmi'
-import { ConnectKitButton } from 'connectkit'
 import { toast } from 'sonner'
 import { usePrivex } from '../lib/store'
 import { fetchChallenge, verifySignature, setToken, healthCheck } from '../lib/relay'
@@ -127,17 +126,13 @@ export default function AuthGate() {
 
         {/* Auth buttons */}
         {!isConnected ? (
-          <ConnectKitButton.Custom>
-            {({ show }) => (
-              <button
-                onClick={show}
-                className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)', color: '#080e1a' }}
-              >
-                Connect Wallet
-              </button>
-            )}
-          </ConnectKitButton.Custom>
+          <button
+            onClick={() => { window.dispatchEvent(new CustomEvent('privex:open-wallet')) }}
+            className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)', color: '#080e1a' }}
+          >
+            Connect Wallet
+          </button>
         ) : (
           <button
             onClick={() => { void authenticate() }}

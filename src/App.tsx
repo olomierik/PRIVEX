@@ -16,6 +16,7 @@ import SecuritySection from './components/sections/SecuritySection'
 import SettingsSection from './components/sections/SettingsSection'
 import AdminSection from './components/sections/AdminSection'
 import { healthCheck, setWalletAddress } from './lib/relay'
+import { loadOrCreateKeys } from './lib/crypto'
 
 function SectionContent({ section }: { section: NavSection }) {
   switch (section) {
@@ -43,6 +44,24 @@ function AppInner() {
   // Keep relay wallet address in sync with connected wallet
   useEffect(() => {
     setWalletAddress(address ?? null)
+  }, [address])
+
+  // Auto-load/create encryption keys when wallet connects — no signature needed.
+  // Keys are derived from a wallet-specific seed stored in IndexedDB (local only).
+  // This makes all encryption status items show Active as soon as wallet connects.
+  useEffect(() => {
+    if (!address) return
+    void (async () => {
+      try {
+        const { privKeys, bundle } = await loadOrCreateKeys(address)
+        const handle = state.privexHandle ?? ''
+        dispatch({ type: 'SET_IDENTITY', handle, keyBundle: bundle, privKeys })
+        dispatch({ type: 'AUTH_SUCCESS', token: address })
+      } catch {
+        // silent — user can retry from Security section
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address])
 
   useEffect(() => {

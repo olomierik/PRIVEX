@@ -6,10 +6,11 @@ import { motion } from 'framer-motion'
 import {
   Lock, Shield, MessageSquare, Phone, Mail, CreditCard,
   ArrowLeftRight, Globe, ArrowRight, CheckCircle2, Eye, EyeOff,
-  Zap, ShieldCheck,
+  Zap, ShieldCheck, Flame, Copy, Twitter,
 } from 'lucide-react'
 import { usePrivex, type NavSection } from '../../lib/store'
-import { ConnectKitButton } from 'connectkit'
+import { useAccount, useConnect } from 'wagmi'
+import { PVX_TOKEN_ADDRESS } from '../../config'
 
 // ─── Cosmic Canvas ────────────────────────────────────────────────────────────
 
@@ -251,7 +252,23 @@ const PILLARS = [
 
 export default function HomeSection() {
   const { dispatch } = usePrivex()
+  const { isConnected } = useAccount()
+  const { connectors, connect } = useConnect()
   const [visible, setVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copyCA = () => {
+    void navigator.clipboard.writeText(PVX_TOKEN_ADDRESS)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  const handleConnect = () => {
+    // Prefer WalletConnect (shows QR modal), fallback to first connector
+    const wc = connectors.find(c => c.id === 'walletConnect')
+    const target = wc ?? connectors[0]
+    if (target) connect({ connector: target })
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 80)
@@ -282,18 +299,6 @@ export default function HomeSection() {
           <span className="text-[12px] font-medium tracking-wide">End-to-End Encrypted · No KYC · Your wallet is your identity</span>
         </motion.div>
 
-        {/* Logo mark */}
-        <motion.div {...fadeUp(0.10)} className="mb-7">
-          <div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(37,99,235,0.25) 0%, rgba(79,70,229,0.30) 100%)',
-              border: '1px solid rgba(96,165,250,0.30)',
-              boxShadow: '0 0 40px rgba(96,165,250,0.20), 0 0 80px rgba(79,70,229,0.10)',
-            }}>
-            <img src="/privex-logo.svg" alt="PRIVEX" className="w-12 h-12" />
-          </div>
-        </motion.div>
-
         {/* Headline */}
         <motion.h1 {...fadeUp(0.15)}
           className="display font-bold text-[clamp(2.4rem,6vw,4.5rem)] leading-[1.08] tracking-[-0.03em] mb-5 max-w-4xl">
@@ -309,19 +314,15 @@ export default function HomeSection() {
 
         {/* CTA row */}
         <motion.div {...fadeUp(0.25)} className="flex flex-col sm:flex-row items-center gap-3">
-          <ConnectKitButton.Custom>
-            {({ isConnected, show }) => (
-              <button onClick={isConnected ? () => go('messages') : show}
-                className="flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-semibold text-[15px] transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
-                style={{
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
-                  color: '#ffffff',
-                  boxShadow: '0 0 24px rgba(79,70,229,0.40), 0 4px 16px rgba(0,0,0,0.30)',
-                }}>
-                {isConnected ? <><MessageSquare size={16} />Open Messages</> : <><Shield size={16} />Connect &amp; Enter</>}
-              </button>
-            )}
-          </ConnectKitButton.Custom>
+          <button onClick={isConnected ? () => go('messages') : handleConnect}
+            className="flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-semibold text-[15px] transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
+              color: '#ffffff',
+              boxShadow: '0 0 24px rgba(79,70,229,0.40), 0 4px 16px rgba(0,0,0,0.30)',
+            }}>
+            {isConnected ? <><MessageSquare size={16} />Open Messages</> : <><Shield size={16} />Connect &amp; Enter</>}
+          </button>
           <button onClick={() => go('identity')}
             className="flex items-center gap-2 px-6 py-3.5 rounded-2xl font-medium text-[14px] transition-all hover:bg-white/10"
             style={{ color: 'var(--muted)', border: '1px solid var(--border-strong)' }}>
@@ -406,6 +407,84 @@ export default function HomeSection() {
         </div>
       </section>
 
+      {/* ── PVX TOKEN ── */}
+      <section className="relative z-10 px-6 pb-20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div {...fadeUp(0.05)} className="text-center mb-10">
+            <div className="label-caps mb-3">PVX Token</div>
+            <h2 className="display font-bold text-[clamp(1.6rem,4vw,2.4rem)] tracking-tight" style={{ color: 'var(--ink)' }}>
+              Utility. Deflation. Governance.
+            </h2>
+          </motion.div>
+
+          {/* CA bar */}
+          <motion.div {...fadeUp(0.08)} className="glass rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.22)' }}>
+                <Flame size={15} style={{ color: '#fb923c' }} />
+              </div>
+              <span className="text-[12px] font-semibold tracking-wide uppercase" style={{ color: 'var(--subtle)' }}>Contract Address</span>
+            </div>
+            <div className="flex-1 font-mono text-[13px] break-all" style={{ color: 'var(--ink-2)' }}>
+              {PVX_TOKEN_ADDRESS}
+            </div>
+            <button onClick={copyCA}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all flex-shrink-0"
+              style={{
+                background: copied ? 'rgba(74,222,128,0.12)' : 'rgba(96,165,250,0.10)',
+                border: `1px solid ${copied ? 'rgba(74,222,128,0.30)' : 'rgba(96,165,250,0.20)'}`,
+                color: copied ? '#4ade80' : 'var(--accent)',
+              }}>
+              <Copy size={12} />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </motion.div>
+
+          {/* Burn + tokenomics stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Fee Burn Rate',     value: '25%',        desc: 'of all service fees auto-burned', color: '#fb923c', icon: Flame },
+              { label: 'Treasury Share',    value: '75%',        desc: 'of fees to admin treasury',       color: '#60a5fa', icon: CreditCard },
+              { label: 'Burn Mechanic',     value: 'Auto',       desc: 'triggered on every payment',      color: '#a78bfa', icon: Zap },
+              { label: 'Token Standard',    value: 'ERC-20',     desc: 'on Arc Mainnet',                  color: '#34d399', icon: ShieldCheck },
+            ].map((stat, i) => {
+              const Icon = stat.icon
+              return (
+                <motion.div key={stat.label} {...fadeUp(0.10 + i * 0.06)}
+                  className="glass rounded-2xl p-5 flex flex-col gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: stat.color + '15', border: `1px solid ${stat.color}28` }}>
+                    <Icon size={16} style={{ color: stat.color }} />
+                  </div>
+                  <div>
+                    <div className="text-[22px] font-bold tracking-tight mb-0.5" style={{ color: stat.color }}>{stat.value}</div>
+                    <div className="text-[12px] font-semibold mb-1" style={{ color: 'var(--ink-2)' }}>{stat.label}</div>
+                    <div className="text-[11px] leading-snug" style={{ color: 'var(--subtle)' }}>{stat.desc}</div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+
+          {/* How burn works */}
+          <motion.div {...fadeUp(0.20)} className="glass-mid rounded-2xl p-6 mt-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: 'rgba(251,146,60,0.10)', border: '1px solid rgba(251,146,60,0.22)' }}>
+                <Flame size={18} style={{ color: '#fb923c' }} />
+              </div>
+              <div>
+                <div className="font-semibold text-[14px] mb-1.5" style={{ color: 'var(--ink)' }}>How the burn works</div>
+                <p className="text-[13px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+                  Every USDC payment made inside PRIVEX flows through our on-chain PaymentRouter contract. The contract automatically calls <span className="font-mono text-[12px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(251,146,60,0.10)', color: '#fb923c' }}>burnFrom()</span> to destroy 25% of the equivalent PVX value and forwards the remaining 75% to the treasury. No manual action needed — every transaction reduces the PVX supply forever.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ── BOTTOM CTA ── */}
       <section className="relative z-10 px-6 pb-24">
         <div className="max-w-2xl mx-auto text-center">
@@ -418,23 +497,43 @@ export default function HomeSection() {
             <p className="text-[14px] leading-relaxed mb-7" style={{ color: 'var(--muted)' }}>
               No accounts. No email sign-up. No phone number. Your wallet key is your identity — connect once and everything follows.
             </p>
-            <ConnectKitButton.Custom>
-              {({ isConnected, show }) => (
-                <button onClick={isConnected ? () => go('messages') : show}
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl font-semibold text-[15px] transition-all hover:opacity-90"
-                  style={{
-                    background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
-                    color: '#ffffff',
-                    boxShadow: '0 0 20px rgba(79,70,229,0.35)',
-                  }}>
-                  {isConnected ? 'Go to Messages' : 'Connect Wallet — it\'s free'}
-                  <ArrowRight size={15} />
-                </button>
-              )}
-            </ConnectKitButton.Custom>
+            <button onClick={isConnected ? () => go('messages') : handleConnect}
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl font-semibold text-[15px] transition-all hover:opacity-90"
+              style={{
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
+                color: '#ffffff',
+                boxShadow: '0 0 20px rgba(79,70,229,0.35)',
+              }}>
+              {isConnected ? 'Go to Messages' : 'Connect Wallet — it\'s free'}
+              <ArrowRight size={15} />
+            </button>
           </div>
         </div>
       </section>
+      {/* ── FOOTER ── */}
+      <footer className="relative z-10 px-6 pb-10 pt-4">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4"
+          style={{ borderTop: '1px solid var(--border)', paddingTop: 24 }}>
+          <div className="flex items-center gap-3">
+            <img src="/privex-icon.svg" alt="PRIVEX" className="w-6 h-6 opacity-60" />
+            <span className="text-[13px] font-semibold tracking-wide" style={{ color: 'var(--subtle)' }}>PRIVEX</span>
+            <span className="text-[12px]" style={{ color: 'var(--subtle)', opacity: 0.5 }}>· End-to-End Encrypted</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a href="https://x.com/privex2026?s=11"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/6"
+              style={{ color: 'var(--muted)', border: '1px solid var(--border)', fontSize: 13 }}>
+              <Twitter size={14} />
+              <span>@privex2026</span>
+            </a>
+            <span className="text-[11px]" style={{ color: 'var(--subtle)', opacity: 0.4 }}>
+              PVX: {PVX_TOKEN_ADDRESS.slice(0, 6)}…{PVX_TOKEN_ADDRESS.slice(-4)}
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

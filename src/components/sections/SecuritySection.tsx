@@ -7,7 +7,7 @@ import { useAccount, useWriteContract } from 'wagmi'
 import { ACCESS_MANAGER_ABI } from '../../lib/abis'
 
 const ACCESS_MANAGER_ADDRESS = import.meta.env.VITE_ACCESS_MANAGER_ADDRESS as `0x${string}` | undefined
-const ARC_TESTNET_ID = 5042002
+const ARC_MAINNET_ID = 5042
 
 interface Session {
   id: string
@@ -47,7 +47,7 @@ export default function SecuritySection() {
           abi: ACCESS_MANAGER_ABI,
           functionName: 'updateCommitment',
           args: [commitment],
-          chainId: ARC_TESTNET_ID,
+          chainId: ARC_MAINNET_ID,
         })
       }
 

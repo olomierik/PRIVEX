@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Home, MessageSquare, Phone, Mail, CreditCard, ArrowLeftRight,
@@ -6,8 +6,8 @@ import {
   LayoutDashboard,
 } from 'lucide-react'
 import { usePrivex, type NavSection } from '../lib/store'
-import { useAccount } from 'wagmi'
-import { ConnectKitButton } from 'connectkit'
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { WC_PROJECT_ID } from '../config'
 
 const NAV_GROUPS = [
   {
@@ -54,7 +54,23 @@ const SECTION_TITLES: Partial<Record<NavSection, string>> = {
 
 export default function PrivexLayout({ children }: { children: ReactNode }) {
   const { state, dispatch } = usePrivex()
-  const { address } = useAccount()
+  const { address, isConnected } = useAccount()
+  const { connectors, connect } = useConnect()
+  const { disconnect } = useDisconnect()
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false)
+  const [wcConnecting, setWcConnecting] = useState(false)
+
+  const connectWalletConnect = () => {
+    if (!WC_PROJECT_ID) return
+    const wc = connectors.find(c => c.id === 'walletConnect')
+    if (!wc) return
+    setWcConnecting(true)
+    setWalletMenuOpen(false)
+    connect(
+      { connector: wc },
+      { onSettled: () => setWcConnecting(false) },
+    )
+  }
 
   // Always dark mode — purge any stale light setting
   useEffect(() => {
@@ -119,7 +135,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
                 {/* Logo mark — white on dark, always visible */}
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.18) 0%, rgba(79,70,229,0.22) 100%)', border: '1px solid rgba(140,180,255,0.25)' }}>
-                  <img src="/privex-logo.svg" alt="PRIVEX" className="w-6 h-6" />
+                  <img src="/privex-icon.svg" alt="PRIVEX" className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="font-bold tracking-[0.18em] text-[14px]"
@@ -260,7 +276,7 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2 md:hidden">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.18) 0%, rgba(79,70,229,0.22) 100%)', border: '1px solid rgba(140,180,255,0.2)' }}>
-                <img src="/privex-logo.svg" alt="PRIVEX" className="w-5 h-5" />
+                <img src="/privex-icon.svg" alt="PRIVEX" className="w-5 h-5" />
               </div>
               <span className="font-bold tracking-[0.18em] text-[13px]"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: '#f0f6ff' }}>
@@ -275,31 +291,105 @@ export default function PrivexLayout({ children }: { children: ReactNode }) {
             </h1>
           </div>
 
-          {/* Connect Wallet only */}
-          <ConnectKitButton.Custom>
-            {({ isConnected, show, address: addr }) => (
-              <motion.button
-                onClick={show}
-                whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-[13px] transition-all"
-                style={isConnected ? {
-                  background: 'var(--surface-mid)',
-                  border: '1px solid var(--border-strong)',
-                  color: 'var(--ink-2)',
-                  minHeight: 38,
-                } : {
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
-                  border: '1px solid rgba(140,180,255,0.3)',
-                  color: '#ffffff',
-                  minHeight: 38,
-                }}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'secure-pulse' : ''}`}
-                  style={{ background: isConnected ? 'var(--secure)' : 'rgba(255,255,255,0.6)' }} />
-                <span>{isConnected ? `${addr?.slice(0, 6)}…${addr?.slice(-4)}` : 'Connect Wallet'}</span>
-              </motion.button>
-            )}
-          </ConnectKitButton.Custom>
+          {/* Wallet button */}
+          <div className="relative">
+            <motion.button
+              onClick={() => isConnected ? void disconnect() : setWalletMenuOpen(v => !v)}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-[13px] transition-all"
+              style={isConnected ? {
+                background: 'var(--surface-mid)',
+                border: '1px solid var(--border-strong)',
+                color: 'var(--ink-2)',
+                minHeight: 38,
+              } : {
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%)',
+                border: '1px solid rgba(140,180,255,0.3)',
+                color: '#ffffff',
+                minHeight: 38,
+              }}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'secure-pulse' : ''}`}
+                style={{ background: isConnected ? 'var(--secure)' : 'rgba(255,255,255,0.6)' }} />
+              <span>{isConnected && address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'Connect Wallet'}</span>
+            </motion.button>
+
+            {/* Wallet picker dropdown */}
+            <AnimatePresence>
+              {walletMenuOpen && !isConnected && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 z-50 rounded-2xl overflow-hidden"
+                  style={{
+                    width: 260,
+                    background: 'rgba(10,18,32,0.98)',
+                    border: '1px solid rgba(126,179,245,0.18)',
+                    boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(126,179,245,0.08)',
+                    backdropFilter: 'blur(24px)',
+                  }}
+                >
+                  <div className="px-4 pt-4 pb-2">
+                    <div className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>Connect a Wallet</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--subtle)' }}>Choose how to connect</div>
+                  </div>
+                  <div className="px-2 pb-3 space-y-1">
+                    {/* Browser-injected wallets */}
+                    {connectors.map(connector => (
+                      <button
+                        key={connector.id}
+                        onClick={() => { connect({ connector }); setWalletMenuOpen(false) }}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all hover:bg-white/6 text-left"
+                        style={{ minHeight: 48 }}
+                      >
+                        {connector.icon
+                          ? <img src={connector.icon} alt={connector.name} className="w-8 h-8 rounded-xl flex-shrink-0" />
+                          : <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-[12px] font-bold"
+                              style={{ background: 'rgba(126,179,245,0.12)', color: 'var(--accent)' }}>
+                              {connector.name[0]}
+                            </div>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{connector.name}</div>
+                          <div className="text-[11px]" style={{ color: 'var(--subtle)' }}>Browser extension</div>
+                        </div>
+                        <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1.5 1l5 4-5 4"/>
+                        </svg>
+                      </button>
+                    ))}
+                    {/* WalletConnect — lazy loaded */}
+                    {WC_PROJECT_ID && (
+                      <button
+                        onClick={connectWalletConnect}
+                        disabled={wcConnecting}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all hover:bg-white/6 text-left disabled:opacity-60"
+                        style={{ minHeight: 48 }}
+                      >
+                        <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center"
+                          style={{ background: 'rgba(59,130,246,0.15)' }}>
+                          <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+                            <path d="M3.68 2.42C6.62-.52 11.38-.52 14.32 2.42l.4.4a.41.41 0 0 1 0 .58l-1.38 1.38a.21.21 0 0 1-.3 0l-.55-.55C10.27 1.97 7.73 1.97 5.51 4.23l-.58.58a.21.21 0 0 1-.3 0L3.25 3.43a.41.41 0 0 1 0-.58l.43-.43Zm8.47 3.58 1.23 1.23a.41.41 0 0 1 0 .58l-3.64 3.64a.42.42 0 0 1-.59 0L6.7 9.1a.1.1 0 0 0-.15 0L4.1 11.45a.42.42 0 0 1-.59 0L-.13 7.81a.41.41 0 0 1 0-.58l1.23-1.23a.42.42 0 0 1 .59 0L4.17 8.5a.1.1 0 0 0 .15 0l2.44-2.44a.42.42 0 0 1 .59 0l2.44 2.44a.1.1 0 0 0 .15 0l2.44-2.44a.42.42 0 0 1 .59 0Z" fill="#3b82f6"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
+                            {wcConnecting ? 'Opening...' : 'WalletConnect'}
+                          </div>
+                          <div className="text-[11px]" style={{ color: 'var(--subtle)' }}>Scan QR · all mobile wallets</div>
+                        </div>
+                        <svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1.5 1l5 4-5 4"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </header>
 
         {/* Page content */}
