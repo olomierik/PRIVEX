@@ -27,6 +27,8 @@
     "@openzeppelin/contracts": "5.1.0",
     "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.62.7",
+    "@walletconnect/ethereum-provider": "^2.25.0",
+    "@walletconnect/modal": "^2.7.0",
     "@web3icons/react": "^4.0.0",
     "@web3modal/scaffold-utils": "^5.1.11",
     "@web3modal/wagmi": "^5.1.11",
