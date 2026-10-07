@@ -389,3 +389,65 @@ export async function fetchPubkey(walletAddr: string): Promise<string | null> {
   if (error || !data) return null
   return (data as DbPubkey).pubkey_hex
 }
+
+// ─── Handle registry ──────────────────────────────────────────────────────────
+// Maps @privex handles to wallet addresses + public keys.
+// Written when a user registers/sets their handle; read when adding contacts.
+
+export async function publishHandle(handle: string, pubkeyHex: string): Promise<void> {
+  if (!_walletAddress) return
+  const clean = handle.toLowerCase().replace(/@privex$/, '').replace(/^@/, '')
+  await supabase.from('handles').upsert({
+    handle: clean,
+    wallet_addr: _walletAddress.toLowerCase(),
+    pubkey_hex: pubkeyHex,
+    updated_at: Date.now(),
+  }, { onConflict: 'handle' })
+  // Also keep pubkeys table in sync
+  await publishPubkey(pubkeyHex)
+}
+
+export interface HandleRecord {
+  handle: string
+  walletAddr: string
+  pubkeyHex: string
+}
+
+/** Resolve a handle (with or without @privex suffix) to wallet + pubkey */
+export async function resolveHandle(handle: string): Promise<HandleRecord | null> {
+  const clean = handle.toLowerCase().replace(/@privex$/, '').replace(/^@/, '')
+  const { data, error } = await supabase
+    .from('handles')
+    .select('handle, wallet_addr, pubkey_hex')
+    .eq('handle', clean)
+    .single()
+  if (error || !data) return null
+  // oxlint-disable-next-line typescript/no-unsafe-assignment, typescript/no-unsafe-member-access
+  const { handle: h, wallet_addr: w, pubkey_hex: pk } = data as Record<string, string>
+  return { handle: h, walletAddr: w, pubkeyHex: pk }
+}
+
+/** Resolve either a handle@privex OR a 0x address to { walletAddr, pubkeyHex, displayName } */
+export async function resolveContact(input: string): Promise<{
+  walletAddr: string
+  pubkeyHex: string
+  displayName: string
+} | null> {
+  const trimmed = input.trim()
+
+  // Raw 0x address
+  if (/^0x[0-9a-fA-F]{40}$/i.test(trimmed)) {
+    const pubkeyHex = await fetchPubkey(trimmed)
+    return { walletAddr: trimmed.toLowerCase(), pubkeyHex: pubkeyHex ?? '', displayName: `${trimmed.slice(0, 6)}…${trimmed.slice(-4)}` }
+  }
+
+  // handle or handle@privex
+  const isHandle = /^[a-z0-9]{3,32}(@privex)?$/i.test(trimmed)
+  if (isHandle) {
+    const rec = await resolveHandle(trimmed)
+    if (!rec) return null
+    return { walletAddr: rec.walletAddr, pubkeyHex: rec.pubkeyHex, displayName: `${rec.handle}@privex` }
+  }
+
+  return null
+}

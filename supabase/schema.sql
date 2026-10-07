@@ -171,6 +171,34 @@ create policy "pubkeys: update own" on pubkeys
   using (lower(wallet_addr) = current_wallet())
   with check (lower(wallet_addr) = current_wallet());
 
+-- ─── Handles table (handle → wallet + pubkey discovery) ──────────────────────
+drop table if exists handles cascade;
+create table handles (
+  handle      text primary key,               -- e.g. "alice" (no @privex suffix)
+  wallet_addr text not null unique,
+  pubkey_hex  text not null,
+  updated_at  bigint not null default extract(epoch from now())::bigint * 1000
+);
+
+create index handles_wallet_idx on handles(wallet_addr);
+
+alter table handles enable row level security;
+
+-- Anyone can read handles (they are public identities)
+create policy "handles: read all" on handles
+  for select
+  using (true);
+
+-- Only the wallet owner can register/update their own handle
+create policy "handles: upsert own" on handles
+  for insert
+  with check (lower(wallet_addr) = current_wallet());
+
+create policy "handles: update own" on handles
+  for update
+  using (lower(wallet_addr) = current_wallet())
+  with check (lower(wallet_addr) = current_wallet());
+
 -- ─── Realtime publications ────────────────────────────────────────────────────
 -- Run in Supabase dashboard: Database > Replication > supabase_realtime
 -- or uncomment:

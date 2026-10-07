@@ -5,6 +5,9 @@
 declare module '@walletconnect/ethereum-provider' { const x: any; export default x }
 
 interface ImportMetaEnv {
+  readonly DEV: boolean
+  readonly PROD: boolean
+  readonly MODE: string
   readonly VITE_PRIVEX_TOKEN_ADDRESS: string
   readonly VITE_ACCESS_MANAGER_ADDRESS: string
   readonly VITE_PAYMENT_ROUTER_ADDRESS: string

@@ -4,6 +4,7 @@ import { Shield, Key, Copy, Check, RefreshCw, QrCode, AlertTriangle, CheckCircle
 import { toast } from 'sonner'
 import { usePrivex } from '../../lib/store'
 import { computeCommitment, loadOrCreateKeys, deleteLocalKeys } from '../../lib/crypto'
+import { publishHandle } from '../../lib/relay'
 import { ACCESS_MANAGER_ABI } from '../../lib/abis'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 
@@ -132,14 +133,17 @@ export default function IdentitySection() {
         commitment = await computeCommitment(bundle)
       }
 
+      const cleanHandle = handle.toLowerCase().trim()
       writeContract({
         address: ACCESS_MANAGER_ADDRESS,
         abi: ACCESS_MANAGER_ABI,
         functionName: 'registerIdentity',
-        args: [handle.toLowerCase().trim(), commitment],
+        args: [cleanHandle, commitment],
         chainId: ARC_TESTNET_ID,
       })
-      dispatch({ type: 'SET_IDENTITY', handle: handle.toLowerCase().trim(), keyBundle: bundle, privKeys: state.privKeys! })
+      dispatch({ type: 'SET_IDENTITY', handle: cleanHandle, keyBundle: bundle, privKeys: state.privKeys! })
+      // Publish handle → wallet mapping to Supabase for off-chain resolution
+      void publishHandle(cleanHandle, bundle.messagingPublicKey)
     } catch (err) {
       toast.error('Registration failed')
       console.error(err)

@@ -8,7 +8,7 @@ import {
 import { toast } from 'sonner'
 import { usePrivex, type Contact, type LocalMessage, type Group } from '../../lib/store'
 import { encryptForRecipient, decryptFromSender, shortAddress } from '../../lib/crypto'
-import { sendEncryptedMessage, fetchMessages, sendFileMessage, fetchFileMessage, subscribeToMessages } from '../../lib/relay'
+import { sendEncryptedMessage, fetchMessages, sendFileMessage, fetchFileMessage, subscribeToMessages, resolveContact, fetchPubkey } from '../../lib/relay'
 import { encryptFile, decryptFile, formatFileSize, MAX_FILE_BYTES } from '../../lib/fileEncryption'
 import { startRecording, formatDuration } from '../../lib/voiceMessage'
 import { useAccount } from 'wagmi'
@@ -303,6 +303,16 @@ export default function MessagingSection() {
     return unsub
   }, [address, processMessage])
 
+  // Auto-refresh pubkey when opening a conversation with a contact who has no key yet
+  useEffect(() => {
+    if (!state.activeConversation) return
+    const contact = state.contacts.find(c => c.address === state.activeConversation)
+    if (!contact || contact.publicKey) return
+    void fetchPubkey(contact.address).then(key => {
+      if (key) dispatch({ type: 'ADD_CONTACT', contact: { ...contact, publicKey: key, verified: true } })
+    })
+  }, [state.activeConversation, state.contacts, dispatch])
+
   // Disappearing message sweep
   useEffect(() => {
     const sweep = setInterval(() => {
@@ -496,16 +506,31 @@ export default function MessagingSection() {
     setVoiceLevel(0)
   }
 
-  const addContact = () => {
+  const [addingContact, setAddingContact] = useState(false)
+  const addContact = async () => {
     if (!newContactAddr.trim()) return
-    if (!/^0x[0-9a-fA-F]{40}$/.test(newContactAddr)) { toast.error('Invalid Ethereum address'); return }
-    const contact: Contact = {
-      address: newContactAddr.toLowerCase(), handle: shortAddress(newContactAddr),
-      publicKey: '', addedAt: Date.now(), verified: false,
+    setAddingContact(true)
+    try {
+      const resolved = await resolveContact(newContactAddr.trim())
+      if (!resolved) {
+        toast.error('Not found — enter a wallet address (0x...) or handle (name@privex)')
+        return
+      }
+      const contact: Contact = {
+        address: resolved.walletAddr,
+        handle: resolved.displayName,
+        publicKey: resolved.pubkeyHex,
+        addedAt: Date.now(),
+        verified: !!resolved.pubkeyHex,
+      }
+      dispatch({ type: 'ADD_CONTACT', contact })
+      setNewContactAddr(''); setShowAddContact(false)
+      toast.success(resolved.pubkeyHex ? `Added ${resolved.displayName} — encrypted messaging ready` : `Added ${resolved.displayName} — waiting for them to register their identity`)
+    } catch {
+      toast.error('Failed to resolve contact')
+    } finally {
+      setAddingContact(false)
     }
-    dispatch({ type: 'ADD_CONTACT', contact })
-    setNewContactAddr(''); setShowAddContact(false)
-    toast.success('Contact added')
   }
 
   const createGroup = (name: string, members: string[]) => {
@@ -663,13 +688,13 @@ export default function MessagingSection() {
               <input
                 value={newContactAddr}
                 onChange={e => setNewContactAddr(e.target.value)}
-                placeholder="0x... wallet address"
+                placeholder="name@privex or 0x..."
                 className="w-full glass rounded-xl px-3 py-2.5 text-[12px] outline-none"
-                style={{ color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', minHeight: 40 }}
-                onKeyDown={e => { if (e.key === 'Enter') addContact() }}
+                style={{ color: 'var(--ink)', minHeight: 40 }}
+                onKeyDown={e => { if (e.key === 'Enter') { void addContact() } }}
               />
               <div className="flex gap-2">
-                <button onClick={addContact} className="flex-1 py-2 rounded-xl text-[13px] font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-text, #040e20)', minHeight: 40 }}>Add</button>
+                <button onClick={() => { void addContact() }} disabled={addingContact} className="flex-1 py-2 rounded-xl text-[13px] font-semibold disabled:opacity-40" style={{ background: 'var(--accent)', color: 'var(--accent-text, #040e20)', minHeight: 40 }}>{addingContact ? 'Looking up…' : 'Add'}</button>
                 <button onClick={() => setShowAddContact(false)} className="flex-1 py-2 rounded-xl text-[13px]" style={{ background: 'var(--surface-muted)', color: 'var(--muted)', minHeight: 40 }}>Cancel</button>
               </div>
             </div>

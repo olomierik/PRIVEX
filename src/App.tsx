@@ -58,8 +58,8 @@ function AppInner() {
         dispatch({ type: 'SET_IDENTITY', handle, keyBundle: bundle, privKeys })
         dispatch({ type: 'AUTH_SUCCESS', token: address })
         // Publish public key to Supabase so contacts can encrypt messages to us
-        if (bundle?.encryptionPubkey) {
-          void publishPubkey(bundle.encryptionPubkey as string)
+        if (bundle?.messagingPublicKey) {
+          void publishPubkey(bundle.messagingPublicKey)
         }
       } catch {
         // silent — user can retry from Security section

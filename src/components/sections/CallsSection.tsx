@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { usePrivex } from '../../lib/store'
 import { peerRoomId, shortAddress } from '../../lib/crypto'
-import { postSignal, subscribeToSignals } from '../../lib/relay'
+import { postSignal, subscribeToSignals, resolveContact } from '../../lib/relay'
 import { useAccount } from 'wagmi'
 
 type CallState = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended'
@@ -131,7 +131,15 @@ export default function CallsSection() {
   }
 
   const initiateCall = async () => {
-    if (!peerAddress.match(/^0x[0-9a-fA-F]{40}$/)) { toast.error('Invalid address'); return }
+    if (!peerAddress.trim()) { toast.error('Enter an address or handle'); return }
+    // Resolve handle → wallet address if needed
+    let resolvedAddr = peerAddress.trim()
+    if (!/^0x[0-9a-fA-F]{40}$/i.test(resolvedAddr)) {
+      const rec = await resolveContact(resolvedAddr)
+      if (!rec) { toast.error('Handle not found — ask them to register their identity first'); return }
+      resolvedAddr = rec.walletAddr
+      setPeerAddress(resolvedAddr)
+    }
     setCallState('calling')
 
     try {
@@ -320,9 +328,9 @@ export default function CallsSection() {
                 <input
                   value={peerAddress}
                   onChange={e => setPeerAddress(e.target.value)}
-                  placeholder="0x... wallet address"
+                  placeholder="name@privex or 0x..."
                   className="flex-1 glass rounded-xl px-3 py-2.5 text-xs outline-none"
-                  style={{ color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace' }}
+                  style={{ color: 'var(--ink)' }}
                 />
                 <div className="relative">
                   <button

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // oxlint-disable typescript/no-unsafe-member-access
 /**
  * PRIVEX VPN — Phase 4
@@ -187,7 +188,7 @@ export default function VPNSection() {
       toast.success('VPN disconnected')
       return
     }
-    if (!activeSubscription && !import.meta.env.DEV) {
+    if (!activeSubscription && import.meta.env.PROD) {
       toast.error('Purchase a VPN plan first')
       setTab('plans')
       return
